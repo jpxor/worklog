@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640">
+  <rect width="1000" height="640" rx="24" fill="#e8edf2"/>
+  <rect x="72" y="72" width="856" height="496" rx="16" fill="#fff"/>
+  <circle cx="172" cy="172" r="38" fill="#5d80a5"/>
+  <path d="M156 172l12 12 22-26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="242" y="185" font-family="sans-serif" font-size="38" fill="#283748">WorkLog</text>
+  <text x="122" y="290" font-family="sans-serif" font-size="26" fill="#526273">Images and PDFs, alongside your notes.</text>
+  <rect x="122" y="340" width="756" height="14" rx="7" fill="#d5dfe9"/>
+  <rect x="122" y="376" width="588" height="14" rx="7" fill="#d5dfe9"/>
+  <text x="122" y="490" font-family="monospace" font-size="21" fill="#526273">Local files. Read-only previews.</text>
+</svg>
