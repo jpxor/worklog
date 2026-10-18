@@ -106,4 +106,3 @@ See the [build guide](docs/user-guide.md#build-and-checks) for the Windows helpe
 WorkLog was previously named WorkNotes. Existing data, settings, drafts, and backup destinations remain compatible. Internal package/executable names, application identifiers, storage keys, the `worknotes.json` marker, and the `WorkNotes-backup` folder retain their original names to preserve existing workspaces.
 
 </details>
-
