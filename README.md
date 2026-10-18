@@ -4,7 +4,7 @@
 
 ### Project notes and time tracking in a local desktop app
 
-[Getting started](#getting-started) · [Screenshots](#screenshots) · [User guide](docs/user-guide.md) · [LLM connection](docs/mcp.md)
+[Download](https://github.com/jpxor/worklog/releases/latest) · [Getting started](#getting-started) · [User guide](docs/user-guide.md) · [LLM connection](docs/mcp.md)
 
 </div>
 
@@ -19,6 +19,8 @@
 - **Search:** Search note text across projects, including closed projects, and open matching lines.
 - **Attachments and diagrams:** View images and PDFs beside notes and render Mermaid diagrams in Markdown.
 - **Appearance and shortcuts:** Choose light, dark, or system appearance and customize keyboard shortcuts.
+- **Plain-text storage:** Notes are Markdown or UTF-8 text files; time entries are JSON Lines. Read your records with a text editor outside WorkLog.
+- **Backups:** Keep local Git history and back up to a folder or Git remote, manually or on a daily schedule while the app is open.
 
 ## LLM connection
 
@@ -38,6 +40,8 @@ The workspace above uses light appearance; dark appearance is shown below.
 
 ## Getting started
 
+Download the Windows installer or Linux DEB/AppImage from the [latest release](https://github.com/jpxor/worklog/releases/latest). Standalone binaries are also included. Linux packages are built on Ubuntu 22.04 for x86-64; the standalone Linux binary requires GTK/WebKit runtime libraries. Release downloads require repository access while this repository is private.
+
 1. Launch the WorkLog desktop app and choose an empty local data folder, or open an existing WorkLog workspace.
 2. Create a project, then add a note or use **Today's log** to start a dated daily entry.
 3. Write your notes. Add Markdown checkboxes for tasks you want listed in the project overview.
@@ -48,7 +52,7 @@ The [user guide](docs/user-guide.md) covers shortcuts, attachments, time correct
 
 ## Your data and backups
 
-Project notes live in local Markdown and UTF-8 text files; time records live in `time.jsonl`. The workspace is separate from this application source repository.
+Project notes and time records use **plain-text storage** in a local folder you choose: Markdown and UTF-8 text files for notes, and JSON Lines in `time.jsonl` for time records. You can read these files outside WorkLog with a text editor. Image and PDF attachments retain their original formats. The workspace is separate from this application source repository.
 
 WorkLog supports local Git history, scheduled backups to a Git remote or folder, and manual backups. Git history requires Git on your PATH. Scheduled backups run while the app is open, and remote backups use your existing SSH keys or Git credential helper.
 
@@ -92,6 +96,10 @@ npm run tauri build
 The included [GitHub Actions workflow](.github/workflows/build.yml) runs checks and builds Windows NSIS installers and Ubuntu 22.04 DEB/AppImage packages. Local build output is under `src-tauri/target/release/`; packaged installers are under its `bundle/` directory. Ubuntu 20.04 compatibility is not verified.
 
 See the [build guide](docs/user-guide.md#build-and-checks) for the Windows helper script and additional build details.
+
+Pushing a `v` version tag runs the same checks and builds, then creates a GitHub release with installers, standalone binaries, and SHA-256 checksums. The tag must match the version in `package.json` and `src-tauri/tauri.conf.json`.
+
+The GitHub Pages source is in [`site/`](site/). It is prepared but unpublished: Pages requires a paid GitHub plan for this private repository. After enabling Pages with GitHub Actions in repository settings, run the **Deploy project page** workflow manually.
 
 ## Documentation
 
