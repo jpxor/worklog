@@ -1,3 +1,7 @@
+## 0.1.25
+
+- Confirm successful report copying with a brief Copied! message on the Copy button. Reset the confirmation when the report changes or closes.
+
 ## 0.1.24
 
 - Add an opt-in Allow HTTP on a private network setting for remote MCP access without certificate files. TLS remains the default for network sharing, and public interface addresses still require TLS.

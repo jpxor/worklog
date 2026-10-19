@@ -399,13 +399,18 @@ it("applies timesheet presets and switches report grouping", async () => {
   expect(dialog.querySelector(".report-preview")?.textContent).toContain("## One [0h 45m]");
   expect((within(dialog).getByLabelText("From") as HTMLInputElement).value).toBe(today());
   const preview = dialog.querySelector(".report-preview")?.textContent;
-  const writeText = vi.fn().mockResolvedValue(undefined);
+  let finishCopy!: () => void;
+  const writeText = vi.fn(() => new Promise<void>((resolve) => { finishCopy = resolve; }));
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Copy" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(preview));
+  expect(within(dialog).queryByRole("button", { name: "Copied!" })).toBeNull();
+  await act(async () => finishCopy());
+  await within(dialog).findByRole("button", { name: "Copied!" });
   fireEvent.click(within(dialog).getByRole("button", { name: "Export Markdown" }));
   await waitFor(() => expect(exportFile).toHaveBeenCalledWith(preview, today(), today()));
   fireEvent.click(within(dialog).getByRole("button", { name: "Last week" }));
+  expect(within(dialog).getByRole("button", { name: "Copy" })).toBeTruthy();
   const [from, through] = reportRange("lastWeek");
   expect(
     (within(dialog).getByLabelText("From") as HTMLInputElement).value,

@@ -334,6 +334,12 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [from, setFrom] = useState(today().slice(0, 8) + "01");
   const [through, setThrough] = useState(today());
+  const [reportCopied, setReportCopied] = useState(false);
+  useEffect(() => {
+    if (!reportCopied) return;
+    const timeout = setTimeout(() => setReportCopied(false), 2500);
+    return () => clearTimeout(timeout);
+  }, [reportCopied]);
   const [reportGrouping, setReportGrouping] = useState<ReportGrouping>(() => {
     const saved = stored<string>("worknotes.reportGrouping", "project");
     return saved === "day" || saved === "task" ? saved : "project";
@@ -1250,6 +1256,7 @@ export default function App() {
       return String(e);
     }
   }, [modal, data, from, through, reportGrouping]);
+  useEffect(() => setReportCopied(false), [modal, reportText]);
   const timeForm = (
     <>
       <div className="panel-heading">
@@ -2701,10 +2708,12 @@ export default function App() {
                   </button>
                   <button disabled={!validDate(from) || !validDate(through) || from > through}
                     onClick={() => task(async () => {
+                      setReportCopied(false);
                       await navigator.clipboard.writeText(reportText);
+                      setReportCopied(true);
                       setStatus("Report copied");
                     })}>
-                    Copy
+                    <span aria-live="polite">{reportCopied ? "Copied!" : "Copy"}</span>
                   </button>
                 </div>
                 <pre className="report-preview">{reportText}</pre>
