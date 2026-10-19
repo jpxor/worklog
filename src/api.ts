@@ -7,6 +7,7 @@ export interface McpConfig {
   port: number;
   certificatePath: string;
   privateKeyPath: string;
+  allowPrivateNetworkHttp: boolean;
   allowedHosts: string[];
   allowedOrigins: string[];
 }

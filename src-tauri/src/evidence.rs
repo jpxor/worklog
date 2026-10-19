@@ -24,14 +24,15 @@ pub fn definitions() -> Vec<Value> {
     let date = json!({"type":"string","pattern":"^\\d{4}-\\d{2}-\\d{2}$"});
     let page = json!({"type":"integer","minimum":0});
     let limit = json!({"type":"integer","minimum":1,"maximum":100,"default":50});
-    let common = json!({"projectId":string,"from":date,"through":date,"offset":page,"limit":limit,"expectedRevision":string});
+    let common = json!({"taskId":string,"projectCodeId":string,"scope":{"type":"string","enum":["all","task","global"]},"from":date,"through":date,"offset":page,"limit":limit,"expectedRevision":string});
     let specs = [
-        ("list_projects", "List all projects, including closed projects, with time totals and file-date activity evidence. Dates are inclusive local work dates. Projects without matching timestamps remain discoverable: timestamps do not establish when every fact happened. includeGit adds commit-date evidence. No summaries are generated.", vec!["from","through","offset","limit","expectedRevision","includeGit"], vec![]),
-        ("list_time_entries", "Read dated time allocations and descriptions, optionally by project and date range. Totals cover all matches, not just the returned page.", vec!["projectId","from","through","offset","limit","expectedRevision"], vec![]),
-        ("list_notes", "List note paths, file creation/modification timestamps, revisions, and attachment metadata. File dates are discovery hints; use read_note for content. Includes closed projects; saved files only.", vec!["projectId","offset","limit","expectedRevision"], vec![]),
-        ("search_notes", "Literal case-insensitive search of saved Markdown/text notes across all projects or one project. Returns matching lines, snippets, and note revisions. No date filter: old notes may contain relevant work. Page through all matches; external links remain in source text.", vec!["projectId","query","offset","limit","expectedRevision"], vec!["query"]),
-        ("read_note", "Read an exact, character-paginated Markdown/text note with line references and SHA-256 revision. Supply expectedRevision to detect changes. Optional revision is a full Git commit SHA for historical/deleted notes. Does not fetch external URLs or read binary attachments.", vec!["path","revision","offset","limit","expectedRevision"], vec!["path"]),
-        ("list_history", "List Git commits and changed note paths for a project, note, or all projects, with author and commit dates. Date filtering uses local commit dates; recorded dates are not proof of work dates. Use read_note with commit SHA and path to read historical notes. Deleted/renamed paths remain evidence. Git may be unavailable; failure is explicit.", vec!["projectId","path","from","through","offset","limit","expectedRevision"], vec![]),
+        ("list_project_codes", "Discover reporting codes, including archived codes.", vec!["offset","limit","expectedRevision"], vec![]),
+        ("list_tasks", "List all projects, including closed projects, with time totals and file-date activity evidence. Dates are inclusive local work dates. Projects without matching timestamps remain discoverable: timestamps do not establish when every fact happened. includeGit adds commit-date evidence. No summaries are generated.", vec!["from","through","offset","limit","expectedRevision","includeGit"], vec![]),
+        ("list_time_entries", "Read dated time allocations and descriptions, optionally by project and date range. Totals cover all matches, not just the returned page.", vec!["taskId","projectCodeId","from","through","offset","limit","expectedRevision"], vec![]),
+        ("list_notes", "List note paths, file creation/modification timestamps, revisions, and attachment metadata. File dates are discovery hints; use read_note for content. Includes closed projects; saved files only.", vec!["taskId","scope","offset","limit","expectedRevision"], vec![]),
+        ("search_notes", "Literal case-insensitive search of saved Markdown/text notes across all projects or one project. Returns matching lines, snippets, and note revisions. No date filter: old notes may contain relevant work. Page through all matches; external links remain in source text.", vec!["taskId","scope","query","offset","limit","expectedRevision"], vec!["query"]),
+        ("read_note", "Read an exact, character-paginated Markdown/text note with line references and SHA-256 revision. Supply expectedRevision to detect changes. Optional revision is a full Git commit SHA for historical/deleted notes. Does not fetch external URLs or read binary attachments.", vec!["taskId","scope","path","revision","offset","limit","expectedRevision"], vec!["path"]),
+        ("list_history", "List Git commits and changed note paths for a project, note, or all projects, with author and commit dates. Date filtering uses local commit dates; recorded dates are not proof of work dates. Use read_note with commit SHA and path to read historical notes. Deleted/renamed paths remain evidence. Git may be unavailable; failure is explicit.", vec!["taskId","scope","path","from","through","offset","limit","expectedRevision"], vec![]),
     ];
     specs.into_iter().map(|(name, description, fields, required)| {
         let mut properties = serde_json::Map::new();
@@ -50,7 +51,9 @@ pub fn definitions() -> Vec<Value> {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Query {
-    project_id: Option<String>,
+    task_id: Option<String>,
+    project_code_id: Option<String>,
+    scope: Option<String>,
     from: Option<String>,
     through: Option<String>,
     query: Option<String>,
@@ -87,8 +90,19 @@ impl Query {
         self.from.as_ref().is_none_or(|from| date >= from.as_str())
             && self.through.as_ref().is_none_or(|end| date <= end.as_str())
     }
+    fn note(&self, path: &str) -> bool {
+        let global = path.starts_with("global/notes/");
+        match self.scope.as_deref().unwrap_or("all") {
+            "global" if !global => return false,
+            "task" if global => return false,
+            _ => {}
+        }
+        self.task_id
+            .as_ref()
+            .is_none_or(|id| !global && path.split('/').nth(1) == Some(id.as_str()))
+    }
     fn project(&self, id: &str) -> bool {
-        self.project_id.as_ref().is_none_or(|project| project == id)
+        self.task_id.as_ref().is_none_or(|project| project == id)
     }
 }
 fn array<'a>(snapshot: &'a Value, name: &str) -> Result<&'a Vec<Value>> {
@@ -118,9 +132,8 @@ fn paged(items: Vec<Value>, q: &Query, revision: &str) -> Result<Value> {
 // Validate paths independently of shell parsing, including historical/deleted paths.
 fn note_path(root: &Path, path: &str) -> Result<std::path::PathBuf> {
     let parts: Vec<_> = path.split('/').collect();
-    if parts.len() < 4
-        || parts[0] != "projects"
-        || parts[2] != "notes"
+    if !(parts.len() >= 4 && parts[0] == "projects" && parts[2] == "notes"
+        || parts.len() >= 3 && parts[0] == "global" && parts[1] == "notes")
         || path.contains(['\\', ':'])
         || parts.iter().any(|p| p.is_empty())
         || Path::new(path)
@@ -153,7 +166,7 @@ fn metadata(root: &Path, note: &Value) -> Result<Value> {
         time.ok().map(|t| DateTime::<Utc>::from(t).to_rfc3339())
     };
     Ok(
-        json!({"path":path,"projectId":path.split('/').nth(1),"kind":note["kind"].as_str().unwrap_or("text"),"bytes":metadata.len(),"createdAt":timestamp(metadata.created()),"modifiedAt":timestamp(metadata.modified()),"revision":if note["kind"].is_string(){note["revision"].clone()}else{json!(fingerprint(text(note,"content").as_bytes()))}}),
+        json!({"path":path,"scope":if path.starts_with("global/"){ "global" }else{"task"},"taskId":if path.starts_with("global/"){None}else{path.split('/').nth(1)},"kind":note["kind"].as_str().unwrap_or("text"),"bytes":metadata.len(),"createdAt":timestamp(metadata.created()),"modifiedAt":timestamp(metadata.modified()),"revision":if note["kind"].is_string(){note["revision"].clone()}else{json!(fingerprint(text(note,"content").as_bytes()))}}),
     )
 }
 
@@ -172,6 +185,23 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
     let q: Query =
         serde_json::from_value(arguments).map_err(|e| format!("Invalid arguments: {e}"))?;
     q.range()?;
+    if q.scope
+        .as_deref()
+        .is_some_and(|scope| !["all", "task", "global"].contains(&scope))
+        || q.scope.as_deref() == Some("global") && q.task_id.is_some()
+    {
+        return Err("Invalid scope/task combination".into());
+    }
+    if q.path.as_ref().is_some_and(|path| !q.note(path)) {
+        return Err("Path does not match scope/task constraint".into());
+    }
+    if q.project_code_id.as_ref().is_some_and(|id| {
+        !snapshot["projectCodes"]
+            .as_array()
+            .is_some_and(|codes| codes.iter().any(|c| c["id"] == *id))
+    }) {
+        return Err("Unknown projectCodeId".into());
+    }
     if q.limit
         .is_some_and(|n| n == 0 || n > if name == "read_note" { 24000 } else { 100 })
     {
@@ -179,7 +209,7 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
     }
     let projects = array(snapshot, "projects")?;
     if name == "list_history" {
-        if let Some(id) = &q.project_id {
+        if let Some(id) = &q.task_id {
             if id.is_empty()
                 || id.contains(['/', '\\', ':'])
                 || Path::new(id)
@@ -190,11 +220,11 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
             }
         }
     } else if q
-        .project_id
+        .task_id
         .as_ref()
         .is_some_and(|id| !projects.iter().any(|p| text(p, "id") == id))
     {
-        return Err("Unknown projectId".into());
+        return Err("Unknown taskId".into());
     }
     if name == "read_note" {
         return read_note(root, &q);
@@ -212,7 +242,7 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
         Some(Err(error)) => json!({"error":error}),
         None => Value::Null,
     };
-    let revision = fingerprint(&serde_json::to_vec(&json!({"projects":snapshot["projects"],"notes":snapshot["notes"],"records":snapshot["records"],"gitHead":git_state})).map_err(|e|e.to_string())?);
+    let revision = fingerprint(&serde_json::to_vec(&json!({"projects":snapshot["projects"],"projectCodes":snapshot["projectCodes"],"notes":snapshot["notes"],"records":snapshot["records"],"gitHead":git_state})).map_err(|e|e.to_string())?);
     let notes = array(snapshot, "notes")?;
     let entries: Vec<_> = array(snapshot, "records")?
         .iter()
@@ -220,11 +250,33 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
             text(e, "type") == "entry"
                 && q.contains(text(e, "date"))
                 && q.project(text(e, "projectId"))
+                && q.project_code_id
+                    .as_ref()
+                    .is_none_or(|id| e["projectCodeId"] == *id)
         })
         .collect();
     match name {
+        "list_project_codes" => paged(array(snapshot, "projectCodes")?.clone(), &q, &revision),
         "list_time_entries" => {
-            let mut rows: Vec<Value> = entries.iter().map(|e| (*e).clone()).collect();
+            let mut rows: Vec<Value> = entries
+                .iter()
+                .map(|e| {
+                    let mut row = (*e).clone();
+                    row["taskId"] = e["projectId"].clone();
+                    row.as_object_mut().unwrap().remove("projectId");
+                    row["taskName"] = projects
+                        .iter()
+                        .find(|p| p["id"] == e["projectId"])
+                        .map(|p| p["name"].clone())
+                        .unwrap_or(Value::Null);
+                    row["projectCodeLabel"] = snapshot["projectCodes"]
+                        .as_array()
+                        .and_then(|codes| codes.iter().find(|c| c["id"] == e["projectCodeId"]))
+                        .map(|c| c["label"].clone())
+                        .unwrap_or(Value::Null);
+                    row
+                })
+                .collect();
             rows.sort_by(|a, b| {
                 text(a, "date")
                     .cmp(text(b, "date"))
@@ -236,7 +288,11 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
                 .sum();
             let mut result = paged(rows, &q, &revision)?;
             result["totalMinutes"] = json!(total_minutes);
-            result["projectTotals"] = json!(projects
+            result["projectCodeTotals"] = json!(array(snapshot,"projectCodes")?.iter().filter_map(|code| {
+                let minutes:u64 = entries.iter().filter(|e|e["projectCodeId"]==code["id"]).map(|e|e["minutes"].as_u64().unwrap_or(0)).sum();
+                (minutes>0).then(||json!({"projectCodeId":code["id"],"label":code["label"],"minutes":minutes}))
+            }).collect::<Vec<_>>());
+            result["taskTotals"] = json!(projects
                 .iter()
                 .filter_map(|p| {
                     let minutes: u64 = entries
@@ -245,7 +301,7 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
                         .map(|e| e["minutes"].as_u64().unwrap_or(0))
                         .sum();
                     (minutes > 0)
-                        .then(|| json!({"projectId":p["id"],"name":p["name"],"minutes":minutes}))
+                        .then(|| json!({"taskId":p["id"],"name":p["name"],"minutes":minutes}))
                 })
                 .collect::<Vec<_>>());
             Ok(result)
@@ -253,7 +309,7 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
         "list_notes" => paged(
             notes
                 .iter()
-                .filter(|note| q.project(text(note, "path").split('/').nth(1).unwrap_or("")))
+                .filter(|note| q.note(text(note, "path")))
                 .map(|note| metadata(root, note))
                 .collect::<Result<Vec<_>>>()?,
             &q,
@@ -273,9 +329,10 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
                 .build()
                 .map_err(|e| e.to_string())?;
             let mut matches = Vec::new();
-            for note in notes.iter().filter(|n| {
-                !n["kind"].is_string() && q.project(text(n, "path").split('/').nth(1).unwrap_or(""))
-            }) {
+            for note in notes
+                .iter()
+                .filter(|n| !n["kind"].is_string() && q.note(text(n, "path")))
+            {
                 let content = text(note, "content");
                 let note_revision = fingerprint(content.as_bytes());
                 for (index, line) in content.lines().enumerate() {
@@ -283,13 +340,13 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
                         let match_start = line[..found.start()].chars().count();
                         let start = match_start.saturating_sub(60);
                         let snippet: String = line.chars().skip(start).take(240).collect();
-                        matches.push(json!({"path":note["path"],"line":index+1,"column":match_start+1,"snippet":snippet,"snippetStartColumn":start+1,"snippetTruncated":start>0 || line.chars().count()>start+240,"noteRevision":note_revision}));
+                        matches.push(json!({"path":note["path"],"scope":if text(note,"path").starts_with("global/"){"global"}else{"task"},"taskId":if text(note,"path").starts_with("global/"){None}else{text(note,"path").split('/').nth(1)},"line":index+1,"column":match_start+1,"snippet":snippet,"snippetStartColumn":start+1,"snippetTruncated":start>0 || line.chars().count()>start+240,"noteRevision":note_revision}));
                     }
                 }
             }
             paged(matches, &q, &revision)
         }
-        "list_projects" => {
+        "list_tasks" => {
             let mut git_warning = None;
             let commits = if q.include_git {
                 match git_head
@@ -317,7 +374,7 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
                     .collect();
                 let project_notes: Vec<_> = notes
                     .iter()
-                    .filter(|note| text(note, "path").split('/').nth(1) == Some(id))
+                    .filter(|note| text(note, "path").starts_with(&format!("projects/{id}/notes/")))
                     .collect();
                 let mut events = Vec::new();
                 for note in &project_notes {
@@ -351,7 +408,7 @@ pub fn query(root: &Path, snapshot: &Value, name: &str, arguments: Value) -> Res
                 let has_activity = !time.is_empty() || !events.is_empty() || !git_events.is_empty();
                 let file_event_count = events.len();
                 let git_count = git_events.len();
-                rows.push(json!({"id":id,"name":project["name"],"closed":project["closed"],"noteCount":project_notes.len(),"timeEntryCount":time.len(),"totalMinutes":time.iter().map(|e|e["minutes"].as_u64().unwrap_or(0)).sum::<u64>(),"firstWorkDate":time.iter().map(|e|text(e,"date")).min(),"lastWorkDate":time.iter().map(|e|text(e,"date")).max(),"fileEvents":events.into_iter().take(10).collect::<Vec<_>>(),"fileEventCount":file_event_count,"gitCommits":git_events.into_iter().take(10).collect::<Vec<_>>(),"gitCommitCountInDiscoveryWindow":git_count,"hasActivityEvidence":has_activity}));
+                rows.push(json!({"id":id,"name":project["name"],"closed":project["closed"],"defaultProjectCodeId":project["defaultProjectCodeId"],"noteCount":project_notes.len(),"timeEntryCount":time.len(),"totalMinutes":time.iter().map(|e|e["minutes"].as_u64().unwrap_or(0)).sum::<u64>(),"firstWorkDate":time.iter().map(|e|text(e,"date")).min(),"lastWorkDate":time.iter().map(|e|text(e,"date")).max(),"fileEvents":events.into_iter().take(10).collect::<Vec<_>>(),"fileEventCount":file_event_count,"gitCommits":git_events.into_iter().take(10).collect::<Vec<_>>(),"gitCommitCountInDiscoveryWindow":git_count,"hasActivityEvidence":has_activity}));
             }
             let mut result = paged(rows, &q, &revision)?;
             result["gitConsulted"] = json!(q.include_git);
@@ -408,12 +465,15 @@ fn read_note(root: &Path, q: &Query) -> Result<Value> {
     let start_line = prefix.chars().filter(|c| *c == '\n').count() + 1;
     let end = q.offset + text.chars().count();
     Ok(
-        json!({"path":path,"gitCommit":q.revision,"revision":revision,"offset":q.offset,"nextOffset":if end<total {Some(end)}else{None},"totalCharacters":total,"startLine":start_line,"endLine":start_line+text.chars().filter(|c|*c=='\n').count(),"content":text,"source":"saved file or specified Git commit; unsaved editor drafts are not shared"}),
+        json!({"path":path,"scope":if path.starts_with("global/"){ "global" }else{"task"},"taskId":if path.starts_with("global/"){None}else{path.split('/').nth(1)},"gitCommit":q.revision,"revision":revision,"offset":q.offset,"nextOffset":if end<total {Some(end)}else{None},"totalCharacters":total,"startLine":start_line,"endLine":start_line+text.chars().filter(|c|*c=='\n').count(),"content":text,"source":"saved file or specified Git commit; unsaved editor drafts are not shared"}),
     )
 }
 
 // Git is invoked directly, with literal paths, bounded output and a deadline.
 fn git_read(root: &Path, args: &[&str], max: u64) -> Result<String> {
+    if !root.join(".git").exists() {
+        return Err("This workspace has no Git history".into());
+    }
     let mut command = Command::new("git");
     command
         .args([
@@ -500,19 +560,27 @@ fn history_rows(
     args.push("--".into());
     let prefix = if let Some(path) = &q.path {
         note_path(root, path)?;
-        if q.project_id
+        if q.task_id
             .as_ref()
             .is_some_and(|id| path.split('/').nth(1) != Some(id.as_str()))
         {
-            return Err("path does not belong to projectId".into());
+            return Err("path does not belong to taskId".into());
         }
         path.clone()
-    } else if let Some(id) = &q.project_id {
+    } else if let Some(id) = &q.task_id {
         format!("projects/{id}/notes")
     } else {
-        "projects".into()
+        if q.scope.as_deref() == Some("global") {
+            "global/notes"
+        } else {
+            "projects"
+        }
+        .into()
     };
     args.push(prefix);
+    if q.path.is_none() && q.task_id.is_none() && q.scope.as_deref().unwrap_or("all") == "all" {
+        args.push("global/notes".into());
+    }
     let output = git_read(
         root,
         &args.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -531,10 +599,14 @@ fn history_rows(
         let paths: Vec<_> = parts
             .map(|p| p.trim_start_matches('\n'))
             .filter(|p| {
-                p.starts_with("projects/") && p.split('/').nth(2) == Some("notes") && is_text(p)
+                ((p.starts_with("projects/") && p.split('/').nth(2) == Some("notes"))
+                    || p.starts_with("global/notes/"))
+                    && is_text(p)
+                    && q.note(p)
             })
             .collect();
-        result.push(json!({"commit":sha,"committedAt":committed,"authoredAt":authored,"subject":subject.chars().take(500).collect::<String>(),"paths":paths}));
+        let notes: Vec<_> = paths.iter().map(|path| json!({"path":path,"scope":if path.starts_with("global/"){"global"}else{"task"},"taskId":if path.starts_with("global/"){None}else{path.split('/').nth(1)}})).collect();
+        result.push(json!({"commit":sha,"committedAt":committed,"authoredAt":authored,"subject":subject.chars().take(500).collect::<String>(),"paths":paths,"notes":notes}));
     }
     if pagination.is_none() {
         result.truncate(200);
@@ -563,7 +635,7 @@ mod tests {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let content="  # Work\nİ learned 🦀 Rust\nMerged [MR](https://gitlab.corp/team/repo/-/merge_requests/7)\n\n";
         fs::write(path, content).unwrap();
-        let snapshot = json!({"projects":[{"id":"p","name":"Project","closed":true},{"id":"q","name":"No time","closed":false}],"notes":[{"path":"projects/p/notes/daily/log.md","content":content}],"records":[{"type":"entry","id":"one","projectId":"p","date":"2026-10-18","minutes":45,"note":"Built feature"},{"type":"entry","id":"two","projectId":"p","date":"2026-10-19","minutes":30,"note":"Follow up"}]});
+        let snapshot = json!({"projectCodes":[{"id":"test","label":"TEST","archived":false}],"projects":[{"id":"p","name":"Project","closed":true},{"id":"q","name":"No time","closed":false}],"notes":[{"path":"projects/p/notes/daily/log.md","content":content}],"records":[{"type":"entry","projectCodeId":"test","id":"one","projectId":"p","date":"2026-10-18","minutes":45,"note":"Built feature"},{"type":"entry","projectCodeId":"test","id":"two","projectId":"p","date":"2026-10-19","minutes":30,"note":"Follow up"}]});
         (root, snapshot)
     }
     #[test]
@@ -604,7 +676,7 @@ mod tests {
         let result = query(
             root.path(),
             &snapshot,
-            "list_projects",
+            "list_tasks",
             json!({"from":"2026-10-18","through":"2026-10-18","limit":1}),
         )
         .unwrap();
@@ -637,7 +709,7 @@ mod tests {
         assert!(query(
             root.path(),
             &changed,
-            "list_projects",
+            "list_tasks",
             json!({"expectedRevision":result["revision"]})
         )
         .is_err());
@@ -663,7 +735,7 @@ mod tests {
             json!({"limit":101}),
             json!({"command":"delete"}),
         ] {
-            assert!(query(root.path(), &snapshot, "list_projects", args).is_err());
+            assert!(query(root.path(), &snapshot, "list_tasks", args).is_err());
         }
         assert!(query(root.path(), &snapshot, "save_note", json!({})).is_err());
         assert!(query(
@@ -680,7 +752,7 @@ mod tests {
         let projects = query(
             root.path(),
             &snapshot,
-            "list_projects",
+            "list_tasks",
             json!({"includeGit":true}),
         )
         .unwrap();
@@ -708,6 +780,82 @@ mod tests {
         )
         .unwrap();
         assert_eq!(note["content"], snapshot["notes"][0]["content"]);
+    }
+    #[test]
+    fn global_scope_and_code_totals_are_independent_of_pagination() {
+        let (root, mut snapshot) = fixture();
+        fs::create_dir_all(root.path().join("global/notes")).unwrap();
+        fs::write(root.path().join("global/notes/shared.md"), "shared Rust").unwrap();
+        snapshot["notes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"path":"global/notes/shared.md","content":"shared Rust"}));
+        let all = query(root.path(), &snapshot, "list_notes", json!({})).unwrap();
+        assert_eq!(all["total"], 2);
+        let global = query(
+            root.path(),
+            &snapshot,
+            "list_notes",
+            json!({"scope":"global"}),
+        )
+        .unwrap();
+        assert_eq!(global["total"], 1);
+        assert_eq!(global["items"][0]["scope"], "global");
+        assert!(global["items"][0]["taskId"].is_null());
+        assert!(query(
+            root.path(),
+            &snapshot,
+            "list_notes",
+            json!({"scope":"global","taskId":"p"})
+        )
+        .is_err());
+        assert!(query(
+            root.path(),
+            &snapshot,
+            "read_note",
+            json!({"path":"global/notes/shared.md","scope":"task"})
+        )
+        .is_err());
+        let page = query(
+            root.path(),
+            &snapshot,
+            "list_time_entries",
+            json!({"projectCodeId":"test","limit":1}),
+        )
+        .unwrap();
+        assert_eq!(page["totalMinutes"], 75);
+        assert_eq!(page["projectCodeTotals"][0]["minutes"], 75);
+        assert_eq!(page["taskTotals"][0]["minutes"], 75);
+        assert_eq!(page["items"].as_array().unwrap().len(), 1);
+        assert_eq!(page["items"][0]["taskId"], "p");
+        assert_eq!(page["items"][0]["projectCodeLabel"], "TEST");
+        let read = query(
+            root.path(),
+            &snapshot,
+            "read_note",
+            json!({"path":"global/notes/shared.md"}),
+        )
+        .unwrap();
+        assert_eq!(read["scope"], "global");
+        assert!(read["taskId"].is_null());
+        let mut changed = snapshot.clone();
+        changed["projectCodes"][0]["label"] = json!("RENAMED");
+        assert!(query(
+            root.path(),
+            &changed,
+            "list_time_entries",
+            json!({"expectedRevision":page["revision"]})
+        )
+        .is_err());
+        changed = snapshot.clone();
+        changed["notes"][1]["content"] = json!("new global text");
+        assert!(query(
+            root.path(),
+            &changed,
+            "list_notes",
+            json!({"expectedRevision":all["revision"]})
+        )
+        .is_err());
     }
     fn git(root: &Path, args: &[&str]) {
         assert!(Command::new("git")
@@ -745,7 +893,7 @@ mod tests {
             root.path(),
             &snapshot,
             "list_history",
-            json!({"projectId":"p","from":"2026-01-01","through":"2026-12-31","limit":1}),
+            json!({"taskId":"p","from":"2026-01-01","through":"2026-12-31","limit":1}),
         )
         .unwrap();
         assert_eq!(history["items"].as_array().unwrap().len(), 1);
@@ -785,7 +933,7 @@ mod tests {
         let discovery = query(
             root.path(),
             &json!({"projects":snapshot["projects"],"notes":[],"records":[]}),
-            "list_projects",
+            "list_tasks",
             json!({"includeGit":true}),
         )
         .unwrap();

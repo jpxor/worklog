@@ -11,7 +11,7 @@ it("treats overview tabs as pages with a project label and no file rename action
       tabs={["overview:p"]}
       active="overview:p"
       disabled={false}
-      projects={[{ id: "p", name: "One", closed: false }]}
+      projects={[{ id: "p", name: "One", closed: false, defaultProjectCodeId: "test" }]}
       onOpen={onOpen}
       onClose={vi.fn()}
       onRename={vi.fn()}

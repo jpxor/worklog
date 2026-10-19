@@ -15,6 +15,7 @@ const config = {
   port: 43127,
   certificatePath: "",
   privateKeyPath: "",
+  allowPrivateNetworkHttp: false,
   allowedHosts: [],
   allowedOrigins: [],
 };
@@ -28,6 +29,26 @@ const status = {
 };
 beforeEach(() => mocks.control.mockReset().mockResolvedValue(status));
 afterEach(cleanup);
+it("requires an explicit choice to send private-network HTTP settings", async () => {
+  render(<McpSettings />);
+  await screen.findByText("Sharing is off");
+  const checkbox = screen.getByLabelText(
+    "Allow HTTP on a private network",
+  ) as HTMLInputElement;
+  expect(checkbox.checked).toBe(false);
+  fireEvent.change(screen.getByLabelText("Listen IP address"), {
+    target: { value: "192.168.1.20" },
+  });
+  fireEvent.click(checkbox);
+  fireEvent.click(screen.getByRole("button", { name: "Start sharing" }));
+  await waitFor(() =>
+    expect(mocks.control).toHaveBeenCalledWith("start", {
+      ...config,
+      bindHost: "192.168.1.20",
+      allowPrivateNetworkHttp: true,
+    }),
+  );
+});
 it("keeps sharing off until requested, masks credentials, and starts with edited settings", async () => {
   mocks.control.mockImplementation(async (action) =>
     action === "start"
@@ -53,9 +74,7 @@ it("keeps sharing off until requested, masks credentials, and starts with edited
     ...config,
     port: 43128,
   });
-  expect(screen.getByLabelText("Port").matches(":disabled")).toBe(
-    true,
-  );
+  expect(screen.getByLabelText("Port").matches(":disabled")).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Stop sharing" }));
   await screen.findByText("Sharing is off");
   expect(mocks.control).toHaveBeenCalledWith("stop", undefined);

@@ -1,3 +1,11 @@
+import CodePicker from "./CodePicker";
+import GlobalOverview from "./GlobalOverview";
+import {
+  switchSession,
+  isGlobalTab,
+  tabTask,
+  type Session,
+} from "./taskSessions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
@@ -23,7 +31,7 @@ import {
   ArrowUpRight,
   CircleHelp,
 } from "lucide-react";
-import Editor from "./Editor";
+import Editor, { type EditorPosition } from "./Editor";
 import { desktop, directory, exportFile, request, confirmAction } from "./api";
 import { useTextPrompt } from "./Prompt";
 import HelpTour, { type TourStep } from "./HelpTour";
@@ -62,6 +70,7 @@ import {
   report,
   reportRange,
   type ReportPreset,
+  type ReportGrouping,
   today,
   validDate,
   type Entry,
@@ -78,6 +87,9 @@ function stored<T>(key: string, fallback: T): T {
   }
 }
 type Workspace = {
+  positions?: { [path: string]: EditorPosition };
+  sessions?: { [id: string]: Session };
+  taskActive?: string;
   project: string;
   tabs: string[];
   active: string;
@@ -89,6 +101,8 @@ type Workspace = {
   pinned?: string[];
 };
 type Draft = {
+  projectCodeId?: string;
+  overridden?: boolean;
   dateMode?: "today" | "fixed";
   date: string;
   project: string;
@@ -109,38 +123,38 @@ const helpSteps: TourStep[] = [
   {
     id: "projects",
     target: ".sidebar-project .project-combo",
-    title: "Choose or create a project",
-    text: "Choose a project to see its notes. To add one, type a new name and choose Create.",
+    title: "Choose or create a task",
+    text: "Choose a task to see its notes. To add one, type a new name and choose Create.",
   },
   {
     id: "notes",
-    target: ".sidebar-section",
+    target: ".tree",
     title: "Organize your notes",
-    text: "Use + or {{newNote}} to create a note. Use folders to organize notes, and right-click a note to rename, move, or pin it.",
+    text: "Right-click a root folder to create a note or folder, or use {{newNote}}. Global notes start collapsed above task notes. Right-click a note to rename, move, or pin it.",
   },
   {
     id: "overview",
-    target: ".tree-root",
-    title: "Review your project",
-    text: "Click the project name above the notes to see its overview. Unfinished checkboxes appear first. Check an item here to update its original note.",
+    target: '[data-note-root="task"]',
+    title: "Review your task",
+    text: "Click the task name above the notes to see its overview. Unfinished checkboxes appear first. Check an item here to update its original note.",
   },
   {
     id: "editor",
     target: ".note-pane",
     title: "Write and switch notes",
-    text: "Notes save automatically. Use {{switcher}} to find a project or note and {{find}} to search the open note. Drag tabs to reorder them.",
+    text: "Notes save automatically. Use {{switcher}} to find a task or note and {{find}} to search the open note. Drag tabs to reorder them.",
   },
   {
     id: "time",
     target: ".time-panel form",
     title: "Log time quickly",
-    text: "Choose a work date and project, then enter a duration such as 45m, 1.5h, or 1:30. Add a short description of the work. Use today keeps the date current in local time.",
+    text: "Choose a work date and task, then enter a duration such as 45m, 1.5h, or 1:30. Add a short description of the work. Use today keeps the date current in local time.",
   },
   {
     id: "entries",
     target: ".today-summary",
     title: "Review your time",
-    text: "Details shows today’s entries and totals. Open Time history in the top bar to browse any week and edit or remove older entries.",
+    text: "Details shows today’s entries and totals. Open Time history in the Log time panel to browse any week and edit or remove older entries.",
   },
   {
     id: "timer",
@@ -152,13 +166,13 @@ const helpSteps: TourStep[] = [
     id: "reports",
     target: '[data-tour="reports"]',
     title: "Export a time report",
-    text: "Choose an inclusive date range and export time entries, descriptions, and project totals as Markdown for your timesheet.",
+    text: "Choose an inclusive date range and export time entries, descriptions, and project-code totals as Markdown for your timesheet.",
   },
   {
     id: "closed",
     target: ".sidebar-bottom",
-    title: "Close and reopen projects",
-    text: "Close finished projects to remove them from active selectors. Their notes and time remain available. Use Closed projects to reopen one.",
+    title: "Close and reopen tasks",
+    text: "Close finished tasks to remove them from active selectors. Their notes and time remain available. Use Closed tasks to reopen one.",
   },
   {
     id: "settings",
@@ -176,9 +190,38 @@ const helpSteps: TourStep[] = [
 const preview: Snapshot = {
   ...emptySnapshot,
   root: "Desktop preview · files are not connected",
-  projects: [{ id: "sample", name: "Welcome to WorkLog", closed: false }],
-  folders: ["projects/sample/notes"],
+  projects: [
+    {
+      id: "sample",
+      name: "Welcome to WorkLog",
+      closed: false,
+      defaultProjectCodeId: "test",
+    },
+    {
+      id: "second",
+      name: "Password reset",
+      closed: false,
+      defaultProjectCodeId: "test",
+    },
+  ],
+  projectCodes: [
+    { id: "test", label: "PORTAL", archived: false },
+    { id: "support", label: "SUPPORT", archived: false },
+  ],
+  folders: ["projects/sample/notes", "projects/second/notes", "global/notes"],
   notes: [
+    {
+      path: "global/notes/Reference.md",
+      scope: "global",
+      modified: Date.now(),
+      content:
+        "# Team conventions\n\n- [ ] Review the release procedure\n\nAvailable in every task in this workspace.\n",
+    },
+    {
+      path: "projects/second/notes/Reference.md",
+      scope: "task",
+      content: "# Reference\n\nNotes for the second task.\n",
+    },
     {
       path: "projects/sample/notes/Controller testing.md",
       modified: Date.parse("2026-10-18T09:30:00-04:00"),
@@ -200,7 +243,7 @@ const preview: Snapshot = {
     {
       path: "projects/sample/notes/Welcome.md",
       content:
-        "# A little space for your work\n\nKeep your project notes together. Log the time that goes into them.\n\n## Make yourself at home\n\nChoose a local folder in the desktop app to start your workspace, or connect an existing WorkLog repository. Your notes stay ordinary Markdown files.\n\n## Notes that work like you do\n\nProse wraps naturally. Fenced code and logs keep their original columns.\n\n```sh\ngit status --short\ngit log --oneline -5\n```\n\nPress Ctrl+P to jump to a project or note.\n",
+        "# A little space for your work\n\nKeep your project notes together. Log the time that goes into them.\n\n## Make yourself at home\n\nChoose a local folder in the desktop app to start your workspace, or connect an existing WorkLog repository. Your notes stay ordinary Markdown files.\n\n## Notes that work like you do\n\nProse wraps naturally. Fenced code and logs keep their original columns.\n\n```sh\ngit status --short\ngit log --oneline -5\n```\n\nPress Ctrl+P to jump to a task or note.\n",
     },
   ],
 };
@@ -234,12 +277,10 @@ export default function App() {
   const [data, setData] = useState<Snapshot>(desktop ? emptySnapshot : preview);
   const dataRef = useRef(data);
   dataRef.current = data;
-  const [ws, setWs] = useState<Workspace>(() =>
-    stored("worknotes.workspace", initialWorkspace),
-  );
+  const [ws, setWs] = useState<Workspace>(() => initialWorkspace);
   const [draft, setDraft] = useState<Draft>(() =>
     (() => {
-      const saved = stored<Draft>("worknotes.draft", {
+      const saved = stored<Draft>("worknotes.draft.v3", {
         date: today(),
         project: "",
         time: "",
@@ -293,6 +334,13 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [from, setFrom] = useState(today().slice(0, 8) + "01");
   const [through, setThrough] = useState(today());
+  const [reportGrouping, setReportGrouping] = useState<ReportGrouping>(() => {
+    const saved = stored<string>("worknotes.reportGrouping", "project");
+    return saved === "day" || saved === "task" ? saved : "project";
+  });
+  useEffect(() => {
+    localStorage.setItem("worknotes.reportGrouping", JSON.stringify(reportGrouping));
+  }, [reportGrouping]);
   const [detailsDate, setDetailsDate] = useState(today());
   const [detailsEntryId, setDetailsEntryId] = useState<string | null>(null);
   const [moveSource, setMoveSource] = useState("");
@@ -310,7 +358,6 @@ export default function App() {
     panel: boolean;
     popup: boolean;
     timerHidden: boolean;
-    recent: boolean;
   } | null>(null);
   const projectSelector = useRef<HTMLDivElement>(null);
   const guideProjectCreation = () => {
@@ -322,14 +369,12 @@ export default function App() {
       guideProjectCreation();
   }, [data.root, data.projects.length]);
   const [editorRevision, setEditorRevision] = useState(0);
-  const [recentOpen, setRecentOpen] = useState(true);
   const startHelp = () => {
     setHelpMenu(false);
     beforeHelp.current = {
       panel: ws.panel,
       popup: ws.popup,
       timerHidden: ws.timerHidden,
-      recent: recentOpen,
     };
     setProjectHelp(false);
     setModal(null);
@@ -345,7 +390,6 @@ export default function App() {
         popup: previous.popup,
         timerHidden: previous.timerHidden,
       }));
-      setRecentOpen(previous.recent);
     }
   };
   const pending = useRef(
@@ -377,7 +421,7 @@ export default function App() {
       .catch(() => {})
       .then(async () => {
         for (const [path, change] of [...pending.current]) {
-          setSaving(true);
+          const savingNotice = setTimeout(() => setSaving(true), 300);
           try {
             await run("save_note", { path, ...change });
             if (pending.current.get(path) === change)
@@ -389,9 +433,10 @@ export default function App() {
             persistPending();
             setStatus("Saved locally");
           } catch (e) {
-            setError(String(e));
+            setError(`Could not save ${path}: ${String(e)}`);
             throw e;
           } finally {
+            clearTimeout(savingNotice);
             setSaving(false);
           }
         }
@@ -431,8 +476,26 @@ export default function App() {
           stored<[string, { content: string; expected: string }][]>(
             `worknotes.noteDrafts:${d.root}`,
             [],
-          ).filter(([path]) => d.notes.some((n) => n.path === path)),
+          ),
         );
+        setWs(stored(`worknotes.sessions.v3:${d.root}`, initialWorkspace));
+        const savedDraft = stored<Draft>(`worknotes.draft.v3:${d.root}`, {
+          date: today(),
+          project: "",
+          time: "",
+          note: "",
+        });
+        setDraft({
+          ...savedDraft,
+          date:
+            savedDraft.dateMode === "fixed" ||
+            savedDraft.replaces ||
+            savedDraft.time ||
+            savedDraft.note
+              ? savedDraft.date
+              : today(),
+          dateMode: savedDraft.dateMode || "today",
+        });
         setData(d);
         setRemote(d.remote);
         setBackupPath(d.backupPath);
@@ -449,10 +512,18 @@ export default function App() {
       });
   }, []);
   useEffect(() => {
-    localStorage.setItem("worknotes.workspace", JSON.stringify(ws));
+    if (data.root)
+      localStorage.setItem(
+        `worknotes.sessions.v3:${data.root}`,
+        JSON.stringify(ws),
+      );
   }, [ws]);
   useEffect(() => {
-    localStorage.setItem("worknotes.draft", JSON.stringify(draft));
+    if (data.root)
+      localStorage.setItem(
+        `worknotes.draft.v3:${data.root}`,
+        JSON.stringify(draft),
+      );
   }, [draft]);
   useEffect(() => {
     localStorage.setItem("worknotes.timer", JSON.stringify(timer));
@@ -467,13 +538,22 @@ export default function App() {
       !data.projects.some((p) => p.id === ws.project)
     ) {
       const p = data.projects.find((p) => !p.closed);
-      setWs((w) => ({ ...w, project: p?.id || "" }));
+      if (p) setWs((w) => switchSession(w, p.id));
     }
   }, [data.projects, ws.project]);
   useEffect(() => {
-    if (!draft.project && ws.project)
-      setDraft((d) => ({ ...d, project: ws.project }));
-  }, [ws.project, draft.project]);
+    if (ws.project)
+      setDraft((d) =>
+        d.replaces || d.time || d.note || d.overridden
+          ? d
+          : {
+              ...d,
+              project: ws.project,
+              projectCodeId: data.projects.find((p) => p.id === ws.project)
+                ?.defaultProjectCodeId,
+            },
+      );
+  }, [ws.project]);
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
       if (pending.current.size) {
@@ -513,10 +593,20 @@ export default function App() {
         setModal("shortcuts");
         return;
       }
-      if (promptView || helpOpen || (modal && modal !== "switcher")) return;
-      if ((action === "newNote" || action === "dailyNote") && !busy) {
+      if (
+        promptView ||
+        creatingNote ||
+        creatingTask ||
+        helpOpen ||
+        (modal && modal !== "switcher")
+      )
+        return;
+      if (
+        (action === "newNote" || action === "dailyNote") &&
+        !busyRef.current
+      ) {
         if (!data.root) pickWorkspace();
-        else if (!ws.project) guideProjectCreation();
+        else if (action === "dailyNote" && !ws.project) guideProjectCreation();
         else if (action === "dailyNote") todayLog();
         else newItem();
       } else if (action === "timePanel" || action === "timePopup") {
@@ -606,33 +696,72 @@ export default function App() {
       clearInterval(id);
     };
   }, []);
+  const wsRef = useRef(ws);
+  wsRef.current = ws;
+  const transitions = useRef(Promise.resolve());
+  const navigateTask = (id: string | null, path?: string, cursor?: number) => {
+    transitions.current = transitions.current
+      .catch(() => {})
+      .then(async () => {
+        if (id && id !== wsRef.current.project) await flush();
+        setProjectHelp(false);
+        setWs((w) => {
+          let next = id ? switchSession(w, id) : w;
+          const exists = (tab: string) =>
+            tab === "global:overview" ||
+            pending.current.has(tab) ||
+            dataRef.current.notes.some((note) => note.path === tab) ||
+            dataRef.current.projects.some(
+              (task) => overviewTab(task.id) === tab,
+            );
+          const restored = next.tabs.filter(exists);
+          if (restored.length !== next.tabs.length)
+            next = {
+              ...next,
+              tabs: restored,
+              active: restored.includes(next.active)
+                ? next.active
+                : restored.find((tab) => !isGlobalTab(tab)) ||
+                  restored[0] ||
+                  "",
+            };
+          if (!path)
+            return {
+              ...next,
+              recentProjects: [
+                id!,
+                ...(w.recentProjects || []).filter((p) => p !== id),
+              ].slice(0, 8),
+            };
+          const tabs = next.tabs.includes(path)
+            ? next.tabs
+            : isGlobalTab(path)
+              ? [
+                  ...next.tabs.filter(isGlobalTab),
+                  path,
+                  ...next.tabs.filter((p) => !isGlobalTab(p)),
+                ]
+              : [...next.tabs, path];
+          return {
+            ...next,
+            tabs,
+            active: path,
+            taskActive: isGlobalTab(path) ? next.taskActive : path,
+            cursors:
+              cursor === undefined
+                ? next.cursors
+                : { ...next.cursors, [path]: cursor },
+          };
+        });
+      })
+      .catch((e) => setError(String(e)));
+    return transitions.current;
+  };
   const activate = (id: string) => {
-    setProjectHelp(false);
-    setWs((w) => ({
-      ...w,
-      project: id,
-      recentProjects: [
-        id,
-        ...(w.recentProjects || []).filter((p) => p !== id),
-      ].slice(0, 8),
-    }));
-    setDraft((d) => (d.replaces ? d : { ...d, project: id }));
+    void navigateTask(id);
   };
   const openNote = (path: string, cursor?: number) => {
-    const project = overviewProjectId(path) ?? path.split("/")[1];
-    setDraft((d) => (d.replaces ? d : { ...d, project }));
-    setWs((w) => ({
-      ...w,
-      active: path,
-      project,
-      recentProjects: [
-        project,
-        ...(w.recentProjects || []).filter((p) => p !== project),
-      ].slice(0, 8),
-      tabs: w.tabs.includes(path) ? w.tabs : [...w.tabs, path],
-      cursors:
-        cursor === undefined ? w.cursors : { ...w.cursors, [path]: cursor },
-    }));
+    void navigateTask(tabTask(path), path, cursor);
   };
   const [overviewVisit, setOverviewVisit] = useState(0);
   const openOverview = (projectId: string) => {
@@ -677,13 +806,57 @@ export default function App() {
       });
     });
   };
-  const createProject = (name: string, forForm = false) =>
+  const [creatingTask, setCreatingTask] = useState<{
+    name: string;
+    code: string;
+    forForm: boolean;
+  } | null>(null);
+  const createCode = async (label: string) => {
+    const result = await run("create_project_code", { label });
+    return result.projectCodes.find(
+      (c) => c.label.toLowerCase() === label.trim().toLowerCase(),
+    )!.id;
+  };
+  const restoreCode = async (code: Snapshot["projectCodes"][number]) => {
+    await run("update_project_code", { ...code, archived: false });
+  };
+  const rememberCode = (code: string) =>
+    localStorage.setItem(
+      `worknotes.lastCode:${data.root}`,
+      JSON.stringify(code),
+    );
+  const createProject = (name: string, forForm = false) => {
+    const last =
+      forForm && draft.projectCodeId
+        ? draft.projectCodeId
+        : stored<string>(`worknotes.lastCode:${data.root}`, "");
+    setCreatingTask({
+      name,
+      forForm,
+      code: data.projectCodes.some((c) => c.id === last && !c.archived)
+        ? last
+        : "",
+    });
+  };
+  const saveTask = () =>
     task(async () => {
-      const d = await run("create_project", { name });
-      setProjectHelp(false);
-      const p = d.projects.find((p) => p.name === name)!;
-      if (forForm) setDraft((x) => ({ ...x, project: p.id }));
+      if (!creatingTask) return;
+      const d = await run("create_project", {
+        name: creatingTask.name,
+        defaultProjectCodeId: creatingTask.code,
+      });
+      const p = d.projects.find((p) => p.name === creatingTask.name.trim())!;
+      rememberCode(creatingTask.code);
+      if (creatingTask.forForm)
+        setDraft((x) => ({
+          ...x,
+          project: p.id,
+          projectCodeId: p.defaultProjectCodeId,
+          overridden: false,
+        }));
       else activate(p.id);
+      setCreatingTask(null);
+      durationRef.current?.focus();
     });
   const editNote = (path: string, content: string) => {
     const old = pending.current.get(path);
@@ -700,7 +873,11 @@ export default function App() {
     saveTimeout.current = setTimeout(() => flush().catch(() => {}), 650);
   };
   const activeProject = data.projects.find((p) => p.id === ws.project);
-  const activeNote = data.notes.find((n) => n.path === ws.active);
+  const activeNote =
+    data.notes.find((n) => n.path === ws.active) ??
+    (pending.current.has(ws.active)
+      ? { path: ws.active, content: pending.current.get(ws.active)!.expected }
+      : undefined);
   const overviewProject = data.projects.find(
     (p) => p.id === overviewProjectId(ws.active),
   );
@@ -719,46 +896,57 @@ export default function App() {
       openNote(path);
     else newItem(false, ws.project, name);
   };
-  const newItem = async (
+  const [creatingNote, setCreatingNote] = useState<{
+    folder: boolean;
+    owner: string;
+    name: string;
+    base?: string;
+  } | null>(null);
+  const newItem = (
     folder = false,
     projectId = ws.project,
     suggestedName = "",
   ) => {
-    const name = await ask(
-      folder ? "Folder name" : "Note name",
-      suggestedName,
-      folder
-        ? {
-            placeholder: "e.g. Meetings",
-            description:
-              "Created in the project root. For nested folders, enter a path such as meetings/weekly.",
-            submitLabel: "Create folder",
-          }
-        : {
-            placeholder: "e.g. Meeting notes",
-            description: suggestedName
-              ? "Press Enter to create today's log in the daily folder, or type another name or path. The .md extension is optional."
-              : "Created in the project root by default. You can also enter a path, such as meetings/planning.md. The .md extension is optional.",
-            submitLabel: "Create note",
-          },
-    );
-    if (!name) return;
-    task(async () => {
-      let relative = name.trim();
-      if (!folder && !/\.(md|txt)$/i.test(relative)) relative += ".md";
-      const path = `projects/${projectId}/notes/${relative}`;
-      if (
-        !folder &&
-        suggestedName &&
-        dataRef.current.notes.some((note) => note.path === path)
-      ) {
-        openNote(path);
-        return;
-      }
-      await run(folder ? "create_folder" : "create_note", { path });
-      if (!folder) openNote(path);
+    setError("");
+    setCreatingNote({
+      folder,
+      owner: projectId,
+      name: suggestedName || suggestedNoteName(folder, projectId),
     });
   };
+  const suggestedNoteName = (folder: boolean, owner: string, base = "") =>
+    !folder && owner === "global" && !base &&
+    !dataRef.current.notes.some((note) => note.path === `global/notes/${today()}.md`)
+      ? today()
+      : "";
+  const newItemAt = (folder: boolean, path: string) => {
+    const global = path.startsWith("global/");
+    const base = path.split("/").slice(global ? 2 : 3).join("/");
+    setError("");
+    setCreatingNote({
+      folder,
+      owner: global ? "global" : path.split("/")[1],
+      name: suggestedNoteName(folder, global ? "global" : path.split("/")[1], base),
+      base,
+    });
+  };
+  const saveNewNote = () =>
+    task(async () => {
+      if (!creatingNote?.owner)
+        throw new Error("Choose a task or Global notes");
+      const { folder, owner } = creatingNote;
+      let name = creatingNote.name.trim();
+      if (!name) throw new Error("Enter a name");
+      if (!folder && !/\.(md|txt)$/i.test(name)) name += ".md";
+      const relative = [creatingNote.base, name].filter(Boolean).join("/");
+      const path =
+        owner === "global"
+          ? `global/notes/${relative}`
+          : `projects/${owner}/notes/${relative}`;
+      await run(folder ? "create_folder" : "create_note", { path });
+      setCreatingNote(null);
+      if (!folder) openNote(path);
+    });
   const moveNote = (source: string, destination: string) => {
     if (source === destination) return;
     return task(async () => {
@@ -781,31 +969,68 @@ export default function App() {
       persistPending();
       setWs((w) => {
         const map = (path: string) => remapPath(path, source, destination);
+        const sessions = {
+          ...w.sessions,
+          [w.project]: {
+            tabs: w.tabs.filter((p) => !isGlobalTab(p)),
+            active: w.taskActive || w.active,
+          },
+        };
+        const all = [
+          ...new Set([
+            ...w.tabs,
+            ...Object.values(sessions).flatMap((session) => session.tabs),
+          ]),
+        ].map(map);
+        for (const [id, session] of Object.entries(sessions))
+          sessions[id] = {
+            tabs: all.filter((p) => tabTask(p) === id),
+            active: map(session.active),
+          };
+        const destinationTask = tabTask(destination);
+        if (destinationTask && !sessions[destinationTask])
+          sessions[destinationTask] = {
+            tabs: all.filter((p) => tabTask(p) === destinationTask),
+            active: map(w.active),
+          };
+        const tabs = [
+          ...all.filter(isGlobalTab),
+          ...all.filter((p) => tabTask(p) === w.project),
+        ];
+        const active = tabs.includes(map(w.active))
+          ? map(w.active)
+          : tabs.at(-1) || "";
         return {
           ...w,
-          active: map(w.active),
-          tabs: w.tabs.map(map),
-          cursors: Object.fromEntries(
-            Object.entries(w.cursors).map(([path, position]) => [
+          active,
+          tabs,
+          sessions,
+          taskActive: tabTask(active) === w.project ? active : w.taskActive,
+          positions: Object.fromEntries(
+            Object.entries(w.positions || {}).map(([path, pos]) => [
               map(path),
-              position,
+              pos,
             ]),
           ),
+          cursors: Object.fromEntries(
+            Object.entries(w.cursors).map(([path, pos]) => [map(path), pos]),
+          ),
           pinned: (w.pinned || []).map(map),
-          project:
-            map(w.active) !== w.active ? destination.split("/")[1] : w.project,
         };
       });
       setStatus(
-        folder ? "Folder moved · saved locally" : "Note moved · saved locally",
+        `Moved ${source.split("/").at(-1)} to ${destination.startsWith("global/") ? "Global notes" : data.projects.find((p) => p.id === destination.split("/")[1])?.name} · saved locally`,
       );
     });
   };
   const renameNote = async (source = activeNote?.path) => {
     if (!source) return;
-    const ownRoot = source.split("/").slice(0, 3).join("/");
+    const ownRoot = source
+      .split("/")
+      .slice(0, source.startsWith("global/") ? 2 : 3)
+      .join("/");
     const name = await ask(
-      "New path within this project",
+      "New path within these notes",
       source.slice(ownRoot.length + 1),
     );
     if (!name) return;
@@ -832,20 +1057,33 @@ export default function App() {
         path,
         folder,
         trashName,
-        confirmAction,
+        (message) =>
+          confirmAction(
+            path.startsWith("global/") ? `Global notes · ${message}` : message,
+          ),
         (permanent) =>
           run(folder ? "delete_folder" : "delete_note", { path, permanent }),
       );
       if (!outcome) return;
       setWs((w) => {
-        const tabs = w.tabs.filter((tab) => tab !== path);
+        const removed = (p: string) => p === path || p.startsWith(path + "/");
+        const tabs = w.tabs.filter((tab) => !removed(tab));
         return {
           ...w,
           tabs,
           active: w.active === path ? tabs.at(-1) || "" : w.active,
-          pinned: (w.pinned || []).filter((pin) => pin !== path),
+          sessions: Object.fromEntries(
+            Object.entries(w.sessions || {}).map(([id, session]) => [
+              id,
+              {
+                tabs: session.tabs.filter((t) => !removed(t)),
+                active: removed(session.active) ? "" : session.active,
+              },
+            ]),
+          ),
+          pinned: (w.pinned || []).filter((pin) => !removed(pin)),
           cursors: Object.fromEntries(
-            Object.entries(w.cursors).filter(([key]) => key !== path),
+            Object.entries(w.cursors).filter(([key]) => !removed(key)),
           ),
         };
       });
@@ -875,8 +1113,15 @@ export default function App() {
         setRemote(result.remote);
         setBackupPath(result.backupPath);
         setBackupTime(result.backupTime);
-        setWs(initialWorkspace);
-        setDraft({ date: today(), project: "", time: "", note: "" });
+        setWs(stored(`worknotes.sessions.v3:${result.root}`, initialWorkspace));
+        setDraft(
+          stored(`worknotes.draft.v3:${result.root}`, {
+            date: today(),
+            project: "",
+            time: "",
+            note: "",
+          }),
+        );
         setStatus("Saved locally");
       }
     });
@@ -887,6 +1132,7 @@ export default function App() {
         type: "entry",
         id: draft.replaces || crypto.randomUUID(),
         projectId: draft.project,
+        projectCodeId: draft.projectCodeId || "",
         date: draft.date,
         minutes: parsed,
         note: draft.note,
@@ -899,8 +1145,19 @@ export default function App() {
           "This entry no longer exists. Cancel this edit before logging new time.",
         );
       await run("save_entry", { entry: record, expected });
-      setDraft((d) => ({ ...d, time: "", note: "", replaces: undefined }));
-      setStatus("Time logged · saved locally");
+      rememberCode(record.projectCodeId);
+      setDraft((d) => ({
+        ...d,
+        time: "",
+        note: "",
+        replaces: undefined,
+        overridden: false,
+        projectCodeId: data.projects.find((p) => p.id === d.project)
+          ?.defaultProjectCodeId,
+      }));
+      setStatus(
+        `Logged ${formatTime(record.minutes)} · ${data.projects.find((p) => p.id === record.projectId)?.name} · ${data.projectCodes.find((c) => c.id === record.projectCodeId)?.label}${draft.overridden ? " · Next entry uses task default: " + data.projectCodes.find((c) => c.id === data.projects.find((p) => p.id === draft.project)?.defaultProjectCodeId)?.label : ""}`,
+      );
       durationRef.current?.focus();
     });
   const editEntry = (e: Entry) => {
@@ -937,7 +1194,7 @@ export default function App() {
     modal === "searchNotes"
       ? contentMatches.slice(0, searchLimit).map((match) => ({
           label: match.path.split("/notes/")[1],
-          detail: `${data.projects.find((project) => project.id === match.path.split("/")[1])?.name || "Unknown project"} · line ${match.line}`,
+          detail: `${match.path.startsWith("global/") ? "Global notes" : data.projects.find((project) => project.id === match.path.split("/")[1])?.name || "Unknown task"} · line ${match.line}`,
           project: match.path.split("/")[1],
           path: match.path,
           cursor: match.cursor,
@@ -948,7 +1205,7 @@ export default function App() {
             .filter((p) => !p.closed)
             .map((p) => ({
               label: p.name,
-              detail: "Project",
+              detail: "Task",
               project: p.id,
               path: "",
               cursor: undefined as number | undefined,
@@ -962,9 +1219,10 @@ export default function App() {
             )
             .map((n) => ({
               label: n.path.split("/").at(-1)!,
-              detail:
-                data.projects.find((p) => p.id === n.path.split("/")[1])
-                  ?.name || "",
+              detail: n.path.startsWith("global/")
+                ? "Global notes"
+                : data.projects.find((p) => p.id === n.path.split("/")[1])
+                    ?.name || "",
               project: n.path.split("/")[1],
               path: n.path,
               cursor: undefined as number | undefined,
@@ -987,11 +1245,11 @@ export default function App() {
   const reportText = useMemo(() => {
     if (modal !== "report") return "";
     try {
-      return report(data, from, through);
+      return report(data, from, through, reportGrouping);
     } catch (e) {
       return String(e);
     }
-  }, [modal, data, from, through]);
+  }, [modal, data, from, through, reportGrouping]);
   const timeForm = (
     <>
       <div className="panel-heading">
@@ -1033,65 +1291,111 @@ export default function App() {
       <div className="time-body">
         {draft.replaces && <h2>Edit entry</h2>}
         <form
+          className="time-entry-form"
           onSubmit={(e) => {
             e.preventDefault();
             logTime();
           }}
         >
-          <label>
-            Date
-            <input
-              required
-              type="date"
-              value={draft.date}
-              onChange={(e) =>
-                setDraft((d) => ({
-                  ...d,
-                  date: e.target.value,
-                  dateMode: "fixed",
-                }))
-              }
-            />
-            <button
-              type="button"
-              className="text-button"
-              onClick={() =>
-                setDraft((d) => ({ ...d, date: today(), dateMode: "today" }))
-              }
-            >
-              Use today (local time)
-            </button>
-          </label>
-          <label>
-            Project
+          <div className="time-task-field">
+            <div className="time-field-heading">
+              <span>Task</span>
+              {draft.project && draft.project !== ws.project && ws.project && !draft.replaces && (
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setDraft((d) => ({
+                    ...d,
+                    project: ws.project,
+                    projectCodeId: activeProject?.defaultProjectCodeId,
+                    overridden: false,
+                  }))}
+                >
+                  Use current task
+                </button>
+              )}
+            </div>
             <ProjectInput
               projects={data.projects}
               value={draft.project}
-              onPick={(p) => setDraft((d) => ({ ...d, project: p.id }))}
+              onPick={(p) =>
+                setDraft((d) => ({
+                  ...d,
+                  project: p.id,
+                  projectCodeId: d.replaces
+                    ? d.projectCodeId
+                    : p.defaultProjectCodeId,
+                  overridden: false,
+                }))
+              }
               onCreate={(name) => createProject(name, true)}
             />
-          </label>
-          <label>
-            Time
-            <input
-              ref={durationRef}
-              required
-              placeholder="e.g. 45m or 1h 30m"
-              value={draft.time}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, time: e.target.value }))
+          </div>
+          <label title="Time is reported against this code">
+            Project code
+            <CodePicker
+              codes={data.projectCodes}
+              value={draft.projectCodeId || ""}
+              onPick={(id) =>
+                setDraft((d) => ({
+                  ...d,
+                  projectCodeId: id,
+                  overridden:
+                    id !==
+                    data.projects.find((p) => p.id === d.project)
+                      ?.defaultProjectCodeId,
+                }))
               }
+              onCreate={createCode}
+              onRestore={restoreCode}
             />
-            <span
-              className={`field-hint ${draft.time && !parsed ? "invalid" : ""}`}
-            >
-              {draft.time
-                ? parsed
-                  ? formatTime(parsed)
-                  : "Use 45m, 1.5h, or 1:30. Include a unit."
-                : "45m · 1.5h · 1:30"}
+            <span className="field-hint">
+              {draft.projectCodeId ===
+              data.projects.find((p) => p.id === draft.project)
+                ?.defaultProjectCodeId
+                ? "Task default"
+                : "This entry only"}
             </span>
           </label>
+          <div className="time-entry-fields">
+            <div className="time-date-field">
+              <div className="time-field-heading">
+                <label htmlFor="time-entry-date">Date</label>
+                {draft.date !== today() && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => setDraft((d) => ({ ...d, date: today(), dateMode: "today" }))}
+                  >
+                    Use today
+                  </button>
+                )}
+              </div>
+              <input
+                id="time-entry-date"
+                required
+                type="date"
+                value={draft.date}
+                onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value, dateMode: "fixed" }))}
+              />
+            </div>
+            <label>
+              Duration
+              <input
+                ref={durationRef}
+                required
+                aria-label="Duration"
+                placeholder="1h 30m"
+                value={draft.time}
+                onChange={(e) => setDraft((d) => ({ ...d, time: e.target.value }))}
+              />
+              {draft.time && (
+                <span className={`field-hint ${!parsed ? "invalid" : ""}`}>
+                  {parsed ? formatTime(parsed) : "Use 45m, 1.5h, or 1:30."}
+                </span>
+              )}
+            </label>
+          </div>
           <label>
             Note <span className="optional">optional</span>
             <textarea
@@ -1105,7 +1409,15 @@ export default function App() {
           </label>
           <button
             className="primary log-button"
-            disabled={busy || !parsed || !draft.project || !desktop}
+            disabled={
+              busy ||
+              !parsed ||
+              !draft.project ||
+              !data.projectCodes.some(
+                (c) => c.id === draft.projectCodeId && !c.archived,
+              ) ||
+              !desktop
+            }
           >
             <Plus size={16} />
             {busy ? "Saving…" : draft.replaces ? "Save changes" : "Log time"}
@@ -1144,39 +1456,16 @@ export default function App() {
             </button>
           </div>
         </div>
-        <button
-          className="recent-heading"
-          onClick={() => setRecentOpen((v) => !v)}
-        >
-          {recentOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          Recent entries<span>{entries.length}</span>
-        </button>
-        {recentOpen && (
-          <div className="recent-entries">
-            {entries
-              .slice(-8)
-              .reverse()
-              .map((e) => (
-                <div className="entry" key={e.id}>
-                  <div>
-                    <strong>
-                      {data.projects.find((p) => p.id === e.projectId)?.name}
-                    </strong>
-                    <span>{formatTime(e.minutes)}</span>
-                  </div>
-                  <p>{e.note || "No note"}</p>
-                  <footer>
-                    <span>{e.date}</span>
-                    <button onClick={() => editEntry(e)}>Edit</button>
-                    <button onClick={() => removeEntry(e)}>Remove</button>
-                  </footer>
-                </div>
-              ))}
-            {!entries.length && (
-              <p className="muted small">Your time entries will appear here.</p>
-            )}
-          </div>
-        )}
+          <button className="time-history-action"
+            onClick={() => {
+              setDetailsDate(today());
+              setDetailsEntryId(null);
+              setModal("timeHistory");
+            }}
+          >
+            <Clock3 size={15} />
+            Time history
+          </button>
         <div className="quick-projects">
           <div className="eyebrow">QUICK SELECT</div>
           {data.projects
@@ -1196,7 +1485,16 @@ export default function App() {
               <button
                 className={draft.project === p.id ? "chosen" : ""}
                 key={p.id}
-                onClick={() => setDraft((d) => ({ ...d, project: p.id }))}
+                onClick={() =>
+                  setDraft((d) => ({
+                    ...d,
+                    project: p.id,
+                    projectCodeId: d.replaces
+                      ? d.projectCodeId
+                      : p.defaultProjectCodeId,
+                    overridden: false,
+                  }))
+                }
               >
                 {p.name}
               </button>
@@ -1238,27 +1536,20 @@ export default function App() {
             <Search size={15} />
             Search notes
           </button>
-          <button
-            onClick={() => {
-              setDetailsDate(today());
-              setDetailsEntryId(null);
-              setModal("timeHistory");
-            }}
-          >
-            <Clock3 size={15} />
-            Time history
-          </button>
           <button data-tour="reports" onClick={() => setModal("report")}>
             <FileText size={15} />
             Reports
           </button>
           <button
             className={ws.panel ? "active-action" : ""}
-            title={`Toggle time panel (${bindings.timePanel || "unassigned"}) · Popup (${bindings.timePopup || "unassigned"})`}
+            title={`Toggle time panel (${bindings.timePanel || "unassigned"}) · Popup (${bindings.timePopup || "unassigned"})${draft.time || draft.note || draft.overridden ? " · Draft for " + data.projects.find((p) => p.id === draft.project)?.name : ""}`}
             onClick={() => setWs((w) => ({ ...w, panel: !w.panel }))}
           >
             <PanelRightOpen size={16} />
             Log time
+            {!ws.panel && (draft.time || draft.note || draft.overridden)
+              ? " · Draft"
+              : ""}
           </button>
           <div className="help-menu-wrap">
             <button
@@ -1304,6 +1595,25 @@ export default function App() {
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
+          {!!pending.current.size && (
+            <>
+              <button onClick={() => flush().catch(() => {})}>
+                Retry save
+              </button>
+              <button
+                onClick={() => {
+                  const path = [...pending.current.keys()][0];
+                  setWs((w) => ({
+                    ...switchSession(w, tabTask(path) || w.project),
+                    active: path,
+                    tabs: w.tabs.includes(path) ? w.tabs : [...w.tabs, path],
+                  }));
+                }}
+              >
+                Open note
+              </button>
+            </>
+          )}
           <button
             className="icon"
             title="Dismiss error"
@@ -1320,10 +1630,10 @@ export default function App() {
             ref={projectSelector}
           >
             <div className="workspace-label">
-              <div className="eyebrow">WORKSPACE</div>
+              <div className="eyebrow">Task</div>
               <button
                 className="icon"
-                title="Create project"
+                title="Create task"
                 onClick={guideProjectCreation}
               >
                 <Plus size={14} />
@@ -1339,11 +1649,11 @@ export default function App() {
               <div
                 className="project-tutorial"
                 role="dialog"
-                aria-label="Create a project tutorial"
+                aria-label="Create a task tutorial"
               >
                 <button
                   className="icon"
-                  title="Dismiss project tutorial"
+                  title="Dismiss task tutorial"
                   onClick={() => setProjectHelp(false)}
                 >
                   <X size={14} />
@@ -1351,7 +1661,7 @@ export default function App() {
                 <strong>
                   {data.projects.length
                     ? "Create a project"
-                    : "Create your first project"}
+                    : "Create your first task"}
                 </strong>
                 <p>
                   Type a project name in this box, then choose <b>Create</b> or
@@ -1363,42 +1673,42 @@ export default function App() {
               </div>
             )}
           </div>
-          <div className="sidebar-section">
-            <span>PROJECT NOTES</span>
-            <div>
-              <button
-                className="icon"
-                title="New folder"
-                disabled={!activeProject}
-                onClick={() => newItem(true)}
-              >
-                <Folder size={14} />
-              </button>
-              <button
-                className="icon"
-                title={`New note (${bindings.newNote || "unassigned"})`}
-                disabled={!activeProject}
-                onClick={() => newItem()}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-          <button
-            className="daily-log-action"
-            disabled={!activeProject || busy}
-            title={`Today's log (${bindings.dailyNote || "unassigned"})`}
-            onClick={todayLog}
-          >
-            <FileText size={14} />
-            Today's log
-          </button>
           <div className="tree">
             <NoteTree
+              key={data.root + "global"}
+              workspace={data.root}
+              onNewNote={(path) => newItemAt(false, path)}
+              onNewFolder={(path) => newItemAt(true, path)}
+              notes={data.notes}
+              folders={data.folders}
+              prefix="global/notes"
+              defaultCollapsed
+              projectName="Global notes"
+              active={ws.active}
+              onOpen={openNote}
+              onOverview={() => openNote("global:overview")}
+              overviewActive={ws.active === "global:overview"}
+              onMove={moveNote}
+              onRename={renameNote}
+              onDelete={deleteItem}
+              onReveal={revealItem}
+              onMoveProject={(path) => {
+                setMoveSource(path);
+                setModal("moveProject");
+              }}
+              onPin={pinNote}
+              pinned={ws.pinned || []}
+              disabled={busy || !desktop}
+            />
+            <NoteTree
+              key={data.root + noteRoot}
+              workspace={data.root}
+              onNewNote={(path) => newItemAt(false, path)}
+              onNewFolder={(path) => newItemAt(true, path)}
               notes={data.notes}
               folders={data.folders}
               prefix={noteRoot}
-              projectName={activeProject?.name || "Project root"}
+              projectName={activeProject?.name || "Task notes"}
               active={ws.active}
               onOpen={(path) => {
                 if (!busyRef.current) openNote(path);
@@ -1419,13 +1729,6 @@ export default function App() {
               pinned={ws.pinned || []}
               disabled={busy || !desktop}
             />
-            {activeProject &&
-              !data.notes.some((n) => n.path.startsWith(noteRoot + "/")) && (
-                <button className="empty-note" onClick={() => newItem()}>
-                  <Plus size={15} />
-                  Write your first note
-                </button>
-              )}
           </div>
           <div className="sidebar-bottom">
             {!data.root && (
@@ -1436,7 +1739,7 @@ export default function App() {
             )}
             <button onClick={() => setShowClosed((v) => !v)}>
               <Archive size={15} />
-              Closed projects
+              Closed tasks
               <ChevronDown size={13} />
             </button>
             {showClosed &&
@@ -1464,17 +1767,18 @@ export default function App() {
                       ...activeProject,
                       closed: true,
                     });
-                    setWs((w) => ({
-                      ...w,
-                      project:
+                    setWs((w) =>
+                      switchSession(
+                        w,
                         dataRef.current.projects.find((p) => !p.closed)?.id ||
-                        "",
-                    }));
+                          "",
+                      ),
+                    );
                   })
                 }
               >
                 <Archive size={14} />
-                Close current project
+                Close current task
               </button>
             )}
             <button
@@ -1492,6 +1796,8 @@ export default function App() {
             <NoteTabs
               tabs={ws.tabs.filter(
                 (path) =>
+                  path === "global:overview" ||
+                  pending.current.has(path) ||
                   data.notes.some((note) => note.path === path) ||
                   data.projects.some(
                     (project) => overviewTab(project.id) === path,
@@ -1513,13 +1819,22 @@ export default function App() {
             <button
               className="icon new-tab"
               title={`New note (${bindings.newNote || "unassigned"})`}
-              disabled={!activeProject}
+              disabled={!data.root}
               onClick={() => newItem()}
             >
               <Plus size={16} />
             </button>
           </div>
-          {overviewProject ? (
+          {ws.active === "global:overview" ? (
+            <GlobalOverview
+              notes={data.notes}
+              pinned={ws.pinned || []}
+              onOpen={openNote}
+              onNew={() => newItem(false, "global")}
+              onToggle={toggleOverviewTodo}
+              disabled={busy || !desktop}
+            />
+          ) : overviewProject ? (
             <ProjectOverview
               key={`${data.root}:${overviewProject.id}:${overviewVisit}`}
               project={overviewProject}
@@ -1537,14 +1852,19 @@ export default function App() {
             <>
               <div className="breadcrumb">
                 <span>
-                  {
-                    data.projects.find(
-                      (p) => p.id === activeNote.path.split("/")[1],
-                    )?.name
-                  }
+                  {activeNote.path.startsWith("global/")
+                    ? "Global notes"
+                    : data.projects.find(
+                        (p) => p.id === activeNote.path.split("/")[1],
+                      )?.name}
                 </span>
                 <ChevronRight size={12} />
-                <span>{activeNote.path.split("/").slice(3).join(" / ")}</span>
+                <span>
+                  {activeNote.path
+                    .split("/")
+                    .slice(activeNote.path.startsWith("global/") ? 2 : 3)
+                    .join(" / ")}
+                </span>
                 <div className="note-menu" ref={noteMenuHost}>
                   <button
                     className="icon"
@@ -1662,6 +1982,16 @@ export default function App() {
                       pending.current.get(activeNote.path)?.content ??
                       activeNote.content
                     }
+                    position={ws.positions?.[activeNote.path]}
+                    onPosition={(position) =>
+                      setWs((w) => ({
+                        ...w,
+                        positions: {
+                          ...w.positions,
+                          [activeNote.path]: position,
+                        },
+                      }))
+                    }
                     cursor={ws.cursors[activeNote.path] || 0}
                     onCursor={(pos) =>
                       setWs((w) => ({
@@ -1697,8 +2027,8 @@ export default function App() {
               <div className="eyebrow">LESS FRICTION. MORE FOCUS.</div>
               <h1>
                 {data.root && !activeProject
-                  ? "No open projects"
-                  : "No note open"}
+                  ? "No open tasks"
+                  : `No notes open for ${activeProject?.name || "this task"}`}
               </h1>
               {!data.root ? (
                 <button className="primary" onClick={pickWorkspace}>
@@ -1713,18 +2043,21 @@ export default function App() {
                   }
                 >
                   <Plus size={17} />
-                  {activeProject
-                    ? "Create a note"
-                    : "Create your first project"}
+                  {activeProject ? "Create a note" : "Create your first task"}
+                </button>
+              )}
+              {activeProject && (
+                <button onClick={() => openOverview(activeProject.id)}>
+                  Open overview
                 </button>
               )}
               <span className="shortcut-hint">
                 {bindings.switcher ? (
                   <>
-                    <kbd>{bindings.switcher}</kbd> to jump to a project or note
+                    <kbd>{bindings.switcher}</kbd> to jump to a task or note
                   </>
                 ) : (
-                  "Use Jump to anything to find a project or note"
+                  "Use Jump to anything to find a task or note"
                 )}
               </span>
             </div>
@@ -1791,6 +2124,9 @@ export default function App() {
             }}
           >
             Use time
+            {draft.project !== ws.project && draft.project
+              ? ` for ${data.projects.find((p) => p.id === draft.project)?.name}`
+              : ""}
           </button>
           <button
             className="icon"
@@ -1813,7 +2149,11 @@ export default function App() {
             className="time-panel popup"
             role="dialog"
             aria-modal="true"
-            aria-label="Log time"
+            aria-label={
+              draft.time || draft.note || draft.overridden
+                ? `Log time · Draft for ${data.projects.find((p) => p.id === draft.project)?.name || "task"}`
+                : "Log time"
+            }
           >
             {timeForm}
           </section>
@@ -1847,7 +2187,7 @@ export default function App() {
                           : modal === "timeHistory"
                             ? "Time history"
                             : modal === "moveProject"
-                              ? "Move note to another project"
+                              ? "Move note"
                               : "Time report"}
               </h2>
               <button
@@ -1861,42 +2201,66 @@ export default function App() {
             {modal === "moveProject" ? (
               <div className="settings-body">
                 <p>
-                  {moveSource.split("/").at(-1)} will move to the selected
-                  project's root folder.
+                  {moveSource.split("/").at(-1)} will move to the selected notes
+                  folder.
                 </p>
-                {data.projects
+                {[
+                  ...new Set([
+                    "global/notes",
+                    ...data.projects
+                      .filter((p) => !p.closed)
+                      .map((p) => `projects/${p.id}/notes`),
+                    ...data.folders,
+                  ]),
+                ]
                   .filter(
-                    (project) =>
-                      project.id !== moveSource.split("/")[1] &&
-                      !project.closed,
+                    (folder) =>
+                      (folder.startsWith("global/notes") ||
+                        data.projects.some(
+                          (p) =>
+                            !p.closed &&
+                            folder.startsWith(`projects/${p.id}/notes`),
+                        )) &&
+                      folder !== moveSource &&
+                      !folder.startsWith(moveSource + "/") &&
+                      folder !==
+                        moveSource.slice(0, moveSource.lastIndexOf("/")),
                   )
-                  .map((project) => (
-                    <button
-                      key={project.id}
-                      disabled={busy}
-                      onClick={async () => {
-                        const moved = await moveNote(
-                          moveSource,
-                          `projects/${project.id}/notes/${moveSource.split("/").at(-1)}`,
-                        );
-                        if (moved) setModal(null);
-                      }}
-                    >
-                      <Folder size={15} />
-                      {project.name}
-                    </button>
-                  ))}
-                {!data.projects.some(
-                  (project) =>
-                    project.id !== moveSource.split("/")[1] && !project.closed,
-                ) && (
-                  <p>
-                    No other open projects. Create or reopen a project first.
-                  </p>
-                )}
+                  .map((folder) => {
+                    const global = folder.startsWith("global/notes");
+                    const relative = folder
+                      .split("/")
+                      .slice(global ? 2 : 3)
+                      .join(" / ");
+                    const owner = global
+                      ? "Global notes"
+                      : `Task: ${data.projects.find((p) => p.id === folder.split("/")[1])?.name}`;
+                    return (
+                      <button
+                        key={folder}
+                        disabled={busy}
+                        onClick={async () => {
+                          if (
+                            await moveNote(
+                              moveSource,
+                              `${folder}/${moveSource.split("/").at(-1)}`,
+                            )
+                          )
+                            setModal(null);
+                        }}
+                      >
+                        <Folder size={15} />
+                        {owner}
+                        {relative ? ` / ${relative}` : ""}
+                      </button>
+                    );
+                  })}
               </div>
             ) : modal === "timeDetails" || modal === "timeHistory" ? (
               <TimeDetails
+                projectCodes={data.projectCodes}
+                onCreateCode={createCode}
+                onRestoreCode={restoreCode}
                 weekly={modal === "timeHistory"}
                 key={`${detailsDate}:${detailsEntryId || "list"}`}
                 entries={entries}
@@ -1908,6 +2272,7 @@ export default function App() {
                 onSave={(entry, expected) =>
                   task(async () => {
                     await run("save_entry", { entry, expected });
+                    rememberCode(entry.projectCodeId);
                     setStatus("Time entry updated · saved locally");
                   })
                 }
@@ -1923,13 +2288,13 @@ export default function App() {
                     autoFocus
                     placeholder={
                       modal === "searchNotes"
-                        ? "Search text across all project notes…"
-                        : "Search projects and notes…"
+                        ? "Search text across task and global notes…"
+                        : "Search tasks and notes…"
                     }
                     aria-label={
                       modal === "searchNotes"
                         ? "Search note contents"
-                        : "Search projects and notes"
+                        : "Search tasks and notes"
                     }
                     value={query}
                     onChange={(e) => {
@@ -1975,8 +2340,8 @@ export default function App() {
                       {modal === "searchNotes"
                         ? query.trim()
                           ? "No matching note contents."
-                          : "Type text to search Markdown and text notes across all projects, including closed projects. Images and PDFs are not searched."
-                        : "No matching projects or notes."}
+                          : "Type text to search Markdown and text notes across all tasks and global notes, including closed tasks. Images and PDFs are not searched."
+                        : "No matching tasks or notes."}
                     </p>
                   )}
                   {modal === "searchNotes" &&
@@ -2030,7 +2395,53 @@ export default function App() {
                   data folder.
                 </p>
                 <hr />
-                <h3>Projects</h3>
+                <h3>Project codes</h3>
+                <p className="muted small">
+                  Renaming a code updates its label in historical reports.
+                </p>
+                {data.projectCodes.map((code) => (
+                  <div key={code.id}>
+                    {code.label}
+                    {code.archived ? " (archived)" : ""}{" "}
+                    <button
+                      onClick={async () => {
+                        const label = await ask("Code label", code.label);
+                        if (label)
+                          task(async () => {
+                            await run("update_project_code", {
+                              ...code,
+                              label,
+                            });
+                          });
+                      }}
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const affected = data.projects.filter(
+                          (p) => p.defaultProjectCodeId === code.id,
+                        ).length;
+                        if (
+                          !code.archived &&
+                          !(await confirmAction(
+                            `Archive ${code.label}? This affects ${affected} task defaults. New time will require an active code.`,
+                          ))
+                        )
+                          return;
+                        task(async () => {
+                          await run("update_project_code", {
+                            ...code,
+                            archived: !code.archived,
+                          });
+                        });
+                      }}
+                    >
+                      {code.archived ? "Restore" : "Archive"}
+                    </button>
+                  </div>
+                ))}
+                <h3>Tasks</h3>
                 <ProjectInput
                   projects={data.projects}
                   value={ws.project}
@@ -2038,12 +2449,28 @@ export default function App() {
                   onCreate={(name) => createProject(name)}
                 />
                 {activeProject && (
+                  <label>
+                    Default project code
+                    <CodePicker
+                      codes={data.projectCodes}
+                      value={activeProject.defaultProjectCodeId}
+                      onPick={(defaultProjectCodeId) => {
+                        task(async () => {
+                          await run("update_project", {
+                            ...activeProject,
+                            defaultProjectCodeId,
+                          });
+                        });
+                      }}
+                      onCreate={createCode}
+                      onRestore={restoreCode}
+                    />
+                  </label>
+                )}
+                {activeProject && (
                   <button
                     onClick={async () => {
-                      const name = await ask(
-                        "Project name",
-                        activeProject.name,
-                      );
+                      const name = await ask("Task name", activeProject.name);
                       if (name)
                         task(async () => {
                           await run("update_project", {
@@ -2053,13 +2480,13 @@ export default function App() {
                         });
                     }}
                   >
-                    Rename current project
+                    Rename current task
                   </button>
                 )}
                 <hr />
                 <McpSettings />
                 <hr />
-                <h3>Git repository</h3>
+                <h3>Git repository Backup</h3>
                 <p className="muted small">
                   Connect an empty remote for this workspace, or clone existing
                   WorkLog data into a new local folder. Git uses your configured
@@ -2230,6 +2657,14 @@ export default function App() {
                     Weeks run Monday–Sunday. Dates below remain editable.
                   </span>
                 </div>
+                <div className="report-grouping" role="group" aria-label="Group by">
+                  <span>Group by:</span>
+                  {(["project", "day", "task"] as ReportGrouping[]).map((grouping) => (
+                    <button key={grouping} aria-pressed={reportGrouping === grouping} onClick={() => setReportGrouping(grouping)}>
+                      {grouping[0].toUpperCase() + grouping.slice(1)}
+                    </button>
+                  ))}
+                </div>
                 <div className="report-controls">
                   <label>
                     From
@@ -2264,10 +2699,146 @@ export default function App() {
                     <Download size={15} />
                     Export Markdown
                   </button>
+                  <button disabled={!validDate(from) || !validDate(through) || from > through}
+                    onClick={() => task(async () => {
+                      await navigator.clipboard.writeText(reportText);
+                      setStatus("Report copied");
+                    })}>
+                    Copy
+                  </button>
                 </div>
                 <pre className="report-preview">{reportText}</pre>
               </div>
             )}
+          </section>
+        </div>
+      )}
+      {creatingTask && (
+        <div
+          className="overlay"
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Escape") setCreatingTask(null);
+          }}
+        >
+          <section className="modal" role="dialog" aria-label="Create task">
+            <form
+              className="settings-body"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveTask();
+              }}
+            >
+              <label>
+                Task name
+                <input
+                  autoFocus
+                  required
+                  value={creatingTask.name}
+                  onChange={(e) =>
+                    setCreatingTask({ ...creatingTask, name: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Default project code
+                <CodePicker
+                  codes={data.projectCodes}
+                  value={creatingTask.code}
+                  onPick={(code) =>
+                    setCreatingTask((previous) =>
+                      previous ? { ...previous, code } : previous,
+                    )
+                  }
+                  onCreate={createCode}
+                  onRestore={restoreCode}
+                />
+              </label>
+              {creatingTask.code ===
+                stored(`worknotes.lastCode:${data.root}`, "") && (
+                <small>Last used</small>
+              )}
+              {error && <p role="alert">{error}</p>}
+              <button type="button" onClick={() => setCreatingTask(null)}>
+                Cancel
+              </button>
+              <button disabled={busy || !creatingTask.code}>Create task</button>
+            </form>
+          </section>
+        </div>
+      )}
+      {creatingNote && (
+        <div
+          className="overlay"
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Escape") setCreatingNote(null);
+          }}
+        >
+          <section className="modal create-note-modal" role="dialog" aria-modal="true" aria-label={creatingNote.folder ? "Create folder" : "Create note"}>
+            <header className="modal-header">
+              <h2>{creatingNote.folder ? "Create folder" : "Create note"}</h2>
+              <button className="icon" aria-label="Close create dialog" onClick={() => setCreatingNote(null)}>
+                <X size={17} />
+              </button>
+            </header>
+            <form
+              className="settings-body create-note-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveNewNote();
+              }}
+            >
+              <label>
+                {creatingNote.folder ? "Folder name" : "Note name"}
+                <input
+                  required
+                  autoFocus
+                  onFocus={(e) => e.target.select()}
+                  value={creatingNote.name}
+                  onChange={(e) =>
+                    setCreatingNote({ ...creatingNote, name: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Create in
+                <select
+                  required
+                  value={creatingNote.owner}
+                  onChange={(e) =>
+                    setCreatingNote({
+                      ...creatingNote,
+                      owner: e.target.value,
+                      base: "",
+                      name: creatingNote.name === suggestedNoteName(creatingNote.folder, creatingNote.owner, creatingNote.base)
+                        ? suggestedNoteName(creatingNote.folder, e.target.value)
+                        : creatingNote.name,
+                    })
+                  }
+                >
+                  <option value="">Select a task or Global notes</option>
+                  <option value="global">Global notes</option>
+                  {data.projects
+                    .filter((p) => !p.closed)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              {creatingNote.base && <small>Folder: {creatingNote.base}</small>}
+              {error && <p role="alert">{error}</p>}
+              <div className="settings-actions">
+                <button type="button" onClick={() => setCreatingNote(null)}>
+                  Cancel
+                </button>
+                <button className="primary" disabled={busy || !creatingNote.owner || !creatingNote.name.trim()}>
+                  {busy ? "Creating…" : `Create ${creatingNote.folder ? "folder" : "note"}`}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}
@@ -2286,7 +2857,6 @@ export default function App() {
           onStep={(id) => {
             if (["time", "entries"].includes(id)) {
               setWs((w) => ({ ...w, panel: true, popup: false }));
-              setRecentOpen(true);
             }
             if (id === "timer") setWs((w) => ({ ...w, timerHidden: false }));
           }}

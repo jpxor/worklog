@@ -2,7 +2,7 @@ export const shortcutDefinitions = [
   { id: "newNote", name: "New note", key: "Ctrl+N" },
   { id: "dailyNote", name: "Today's log", key: "Ctrl+Shift+D" },
   { id: "searchNotes", name: "Search note contents", key: "Ctrl+Shift+F" },
-  { id: "switcher", name: "Find project or note", key: "Ctrl+P" },
+  { id: "switcher", name: "Find task or note", key: "Ctrl+P" },
   { id: "find", name: "Find in current note", key: "Ctrl+F" },
   { id: "save", name: "Save note now", key: "Ctrl+S" },
   { id: "closeNote", name: "Close note tab", key: "Ctrl+W" },

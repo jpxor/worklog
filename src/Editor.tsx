@@ -142,11 +142,20 @@ const fences = ViewPlugin.fromClass(
   },
 );
 
+export interface EditorPosition {
+  anchor: number;
+  head: number;
+  top: number;
+  left: number;
+}
+
 export default function Editor({
   content,
   onChange,
   onCursor,
   cursor = 0,
+  position,
+  onPosition,
   dark = false,
   plain = false,
 }: {
@@ -154,6 +163,8 @@ export default function Editor({
   onChange: (text: string) => void;
   onCursor: (pos: number) => void;
   cursor?: number;
+  position?: EditorPosition;
+  onPosition?: (position: EditorPosition) => void;
   dark?: boolean;
   plain?: boolean;
 }) {
@@ -164,12 +175,20 @@ export default function Editor({
   callback.current = onChange;
   const cursorCallback = useRef(onCursor);
   cursorCallback.current = onCursor;
+  const positionCallback = useRef(onPosition);
+  positionCallback.current = onPosition;
   useEffect(() => {
     const view = new EditorView({
       parent: host.current!,
       state: EditorState.create({
         doc: content,
-        selection: { anchor: Math.min(cursor, content.length) },
+        selection: {
+          anchor: Math.max(
+            0,
+            Math.min(position?.anchor ?? cursor, content.length),
+          ),
+          head: Math.max(0, Math.min(position?.head ?? cursor, content.length)),
+        },
         extensions: [
           basicSetup,
           Prec.highest(
@@ -230,8 +249,15 @@ export default function Editor({
           ]),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) callback.current(u.state.doc.toString());
-            if (u.selectionSet)
+            if (u.selectionSet) {
               cursorCallback.current(u.state.selection.main.head);
+              positionCallback.current?.({
+                anchor: u.state.selection.main.anchor,
+                head: u.state.selection.main.head,
+                top: u.view.scrollDOM.scrollTop,
+                left: u.view.scrollDOM.scrollLeft,
+              });
+            }
             if (!plain && (u.selectionSet || u.docChanged))
               u.view.requestMeasure({
                 key: "scroll-block-caret",
@@ -321,13 +347,30 @@ export default function Editor({
     window.addEventListener("worknotes:find", find);
     window.addEventListener("worknotes:insert-mermaid", insertMermaid);
     view.focus();
-    if (cursor)
+    if (!position && cursor)
       view.dispatch({
         effects: EditorView.scrollIntoView(Math.min(cursor, content.length), {
           y: "center",
         }),
       });
+    const capture = () =>
+      positionCallback.current?.({
+        anchor: view.state.selection.main.anchor,
+        head: view.state.selection.main.head,
+        top: view.scrollDOM.scrollTop,
+        left: view.scrollDOM.scrollLeft,
+      });
+    view.scrollDOM.addEventListener("scroll", capture);
+    if (position)
+      view.requestMeasure({
+        read: () => null,
+        write: () => {
+          view.scrollDOM.scrollTop = Math.max(0, position.top);
+          view.scrollDOM.scrollLeft = Math.max(0, position.left);
+        },
+      });
     return () => {
+      view.scrollDOM.removeEventListener("scroll", capture);
       view.destroy();
       window.removeEventListener("worknotes:find", find);
       window.removeEventListener("worknotes:insert-mermaid", insertMermaid);

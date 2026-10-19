@@ -43,8 +43,9 @@ export default function ProjectOverview({
   return (
     <section
       className="project-overview"
-      aria-label={`${project.name} project overview`}
+      aria-label={`${project.name} task overview`}
     >
+      <div className="breadcrumb">{project.name} / Overview</div>
       <header className="overview-header">
         <div>
           <h1>{project.name}</h1>
@@ -57,6 +58,7 @@ export default function ProjectOverview({
           New note
         </button>
       </header>
+      <h2>Unchecked items in task notes</h2>
       {items.length ? (
         <ul className="overview-notes">
           {order.current.map((path) => {

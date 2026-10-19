@@ -1,3 +1,5 @@
+import CodePicker from "./CodePicker";
+import type { ProjectCode } from "./model";
 import { useState } from "react";
 import {
   duration,
@@ -10,6 +12,9 @@ import {
 } from "./model";
 
 export default function TimeDetails({
+  projectCodes = [],
+  onCreateCode = async () => "",
+  onRestoreCode = async () => {},
   entries,
   weekly = false,
   projects,
@@ -20,6 +25,9 @@ export default function TimeDetails({
   onSave,
   onRemove,
 }: {
+  projectCodes?: ProjectCode[];
+  onCreateCode?: (label: string) => Promise<string>;
+  onRestoreCode?: (code: ProjectCode) => Promise<void>;
   entries: Entry[];
   weekly?: boolean;
   projects: Project[];
@@ -102,7 +110,7 @@ export default function TimeDetails({
         </strong>
       </div>
       {totals.length > 0 && (
-        <dl className="details-projects" aria-label="Time by project">
+        <dl className="details-projects" aria-label="Time by task">
           {totals.map((project) => (
             <div key={project.id}>
               <dt>{project.name}</dt>
@@ -152,9 +160,9 @@ export default function TimeDetails({
                   />
                 </label>
                 <label>
-                  Project
+                  Task
                   <select
-                    aria-label="Project"
+                    aria-label="Task"
                     required
                     value={editing.projectId}
                     onChange={(e) =>
@@ -170,6 +178,20 @@ export default function TimeDetails({
                   </select>
                 </label>
               </div>
+              <label>
+                Project code
+                <CodePicker
+                  codes={projectCodes}
+                  value={editing.projectCodeId}
+                  onPick={(projectCodeId) =>
+                    setEditing((current) =>
+                      current ? { ...current, projectCodeId } : current,
+                    )
+                  }
+                  onCreate={onCreateCode}
+                  onRestore={onRestoreCode}
+                />
+              </label>
               <label>
                 Duration
                 <input
@@ -223,9 +245,15 @@ export default function TimeDetails({
               <header>
                 <strong>
                   {projects.find((p) => p.id === entry.projectId)?.name ||
-                    "Unknown project"}
+                    "Unknown task"}
                 </strong>
-                <span>{formatTime(entry.minutes)}</span>
+                <span>
+                  {
+                    projectCodes.find((c) => c.id === entry.projectCodeId)
+                      ?.label
+                  }{" "}
+                  · {formatTime(entry.minutes)}
+                </span>
               </header>
               {entry.note && <p className="detail-note">{entry.note}</p>}
               <footer>

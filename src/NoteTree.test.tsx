@@ -141,7 +141,7 @@ it("offers file management actions and places pinned nested notes at the top", (
   expect(onPin).toHaveBeenCalledWith(nested);
   fireEvent.contextMenu(screen.getByRole("button", { name: "draft" }));
   fireEvent.click(
-    screen.getByRole("menuitem", { name: "Move to another project…" }),
+    screen.getByRole("menuitem", { name: "Move…" }),
   );
   expect(onMoveProject).toHaveBeenCalledWith(source);
   fireEvent.contextMenu(screen.getByRole("button", { name: "draft" }));

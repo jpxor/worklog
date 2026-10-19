@@ -33,6 +33,7 @@ const a: Entry = {
   type: "entry",
   id: "a",
   projectId: "p",
+  projectCodeId: "test",
   date: "2026-10-01",
   minutes: 45,
   note: "First | task\nFollow-up",
@@ -43,10 +44,22 @@ describe("ledger and report", () => {
     const records = [
       a,
       b,
-      { ...a, id: "admin", projectId: "admin", minutes: 30 },
+      {
+        ...a,
+        id: "admin",
+        projectId: "admin",
+        projectCodeId: "test",
+        minutes: 30,
+      },
       { ...a, id: "extra", minutes: 15 },
       { ...a, id: "tomorrow", date: "2026-10-02", minutes: 200 },
-      { ...a, id: "voided", projectId: "removed", minutes: 60 },
+      {
+        ...a,
+        id: "voided",
+        projectId: "removed",
+        projectCodeId: "test",
+        minutes: 60,
+      },
       { type: "void" as const, id: "void-record", target: "voided" },
     ];
     expect([...dailyTotals(records, "2026-10-01")]).toEqual([
@@ -66,7 +79,15 @@ describe("ledger and report", () => {
   it("filters inclusive dates and exports plain entries under project headings", () => {
     const data = {
       ...emptySnapshot,
-      projects: [{ id: "p", name: "Closed project", closed: true }],
+      projectCodes: [{ id: "test", label: "Test", archived: false }],
+      projects: [
+        {
+          id: "p",
+          name: "Closed project",
+          closed: true,
+          defaultProjectCodeId: "test",
+        },
+      ],
       records: [
         a,
         b,
@@ -74,46 +95,71 @@ describe("ledger and report", () => {
       ],
     };
     const md = report(data, "2026-10-01", "2026-10-01");
-    expect(md).toContain("Closed project — 1h 30m");
+    expect(md).toContain("Test [1h 30m]");
     expect(md).toContain("Total: 1h 30m");
     expect(md).toContain(
-      `2026-10-01 | 1h 30m | First | task\n${" ".repeat(22)}Follow-up`,
+      `2026-10-01 [1h 30m] Closed project\n    First | task\n    Follow-up`,
     );
     expect(md).not.toContain("| Date |");
     expect(md).not.toContain("<br>");
     expect(md).not.toContain("2026-10-02");
   });
-  it("aligns duration and note columns across projects, including long durations", () => {
+  it("formats unpadded bracketed durations, including long durations", () => {
     const md = report(
       {
         ...emptySnapshot,
+        projectCodes: [{ id: "test", label: "Test", archived: false }],
         projects: [
-          { id: "p", name: "One", closed: false },
-          { id: "q", name: "Two", closed: false },
+          { id: "p", name: "One", closed: false, defaultProjectCodeId: "test" },
+          { id: "q", name: "Two", closed: false, defaultProjectCodeId: "test" },
         ],
         records: [
           { ...a, id: "short", minutes: 5, note: "Short" },
-          { ...a, id: "long", projectId: "q", minutes: 605, note: "Long" },
+          {
+            ...a,
+            id: "long",
+            projectId: "q",
+            projectCodeId: "test",
+            minutes: 595,
+            note: "Long",
+          },
+          {
+            ...a,
+            id: "long-extra",
+            projectId: "q",
+            projectCodeId: "test",
+            minutes: 10,
+            note: "",
+          },
           { ...a, id: "hour", minutes: 60, note: "Hour" },
         ],
       },
       "2026-10-01",
       "2026-10-01",
     );
-    expect(md).toContain("2026-10-01 |  0h 05m | Short");
-    expect(md).toContain("2026-10-01 | 10h 05m | Long");
-    expect(md).toContain("2026-10-01 |  1h 00m | Hour");
+    expect(md).toContain(
+      `2026-10-01 [1h 05m] One\n    Hour\n    Short`,
+    );
+    expect(md).toContain("2026-10-01 [10h 05m] Two\n    Long");
   });
   it("validates dates and ranges", () => {
     expect(validDate("2026-02-30")).toBe(false);
     expect(validDate("2024-02-29")).toBe(true);
     expect(() => report(emptySnapshot, "2026-10-02", "2026-10-01")).toThrow();
   });
-  it("omits blank and whitespace-only lines between and within report entries", () => {
+  it("omits empty note lines", () => {
     const md = report(
       {
         ...emptySnapshot,
-        projects: [{ id: "p", name: "Project", closed: false }],
+        projectCodes: [{ id: "test", label: "Test", archived: false }],
+        projects: [
+          {
+            id: "p",
+            name: "Project",
+            closed: false,
+            defaultProjectCodeId: "test",
+          },
+        ],
         records: [
           {
             ...a,
@@ -129,7 +175,7 @@ describe("ledger and report", () => {
       "2026-10-01",
     );
     expect(md).toContain(
-      `2026-10-01 | 1h 00m | First\n${" ".repeat(22)}Second\n2026-10-01 | 0h 10m |\n2026-10-01 | 0h 20m | Last\n`,
+      `2026-10-01 [1h 30m] Project\n    First\n    Second\n    Last\n`,
     );
     expect(
       md
@@ -152,6 +198,120 @@ describe("calendar weeks", () => {
 });
 
 describe("timesheet reports", () => {
+  it("reports the PORTAL and SUPPORT acceptance example by code and task", () => {
+    const data = {
+      ...emptySnapshot,
+      projectCodes: [
+        { id: "portal", label: "PORTAL", archived: false },
+        { id: "support", label: "SUPPORT", archived: false },
+      ],
+      projects: [
+        {
+          id: "login",
+          name: "Fix login timeout",
+          closed: false,
+          defaultProjectCodeId: "portal",
+        },
+        {
+          id: "reset",
+          name: "Password reset",
+          closed: false,
+          defaultProjectCodeId: "portal",
+        },
+      ],
+      records: [
+        {
+          ...a,
+          id: "1",
+          projectId: "login",
+          projectCodeId: "portal",
+          minutes: 45,
+          note: "Investigated",
+        },
+        {
+          ...a,
+          id: "2",
+          projectId: "login",
+          projectCodeId: "support",
+          minutes: 30,
+          note: "Customer help",
+        },
+        {
+          ...a,
+          id: "3",
+          projectId: "reset",
+          projectCodeId: "portal",
+          minutes: 60,
+          note: "",
+        },
+      ],
+    };
+    const original = JSON.stringify(data);
+    const text = report(data, "2026-10-01", "2026-10-01");
+    expect(text).toContain("## PORTAL [1h 45m]");
+    expect(text).toContain("## SUPPORT [0h 30m]");
+    expect(text).toMatch(
+      /2026-10-01 \[0h 45m\] Fix login timeout\n    Investigated/,
+    );
+    expect(text).toMatch(/2026-10-01 \[1h 00m\] Password reset\n/);
+    expect(text).toMatch(
+      /2026-10-01 \[0h 30m\] Fix login timeout\n    Customer help/,
+    );
+    expect(text).toContain("Total: 2h 15m");
+    expect(JSON.stringify(data)).toBe(original);
+  });
+  it("combines effective entries per project and day without changing the ledger", () => {
+    const data = {
+      ...emptySnapshot,
+      projectCodes: [{ id: "test", label: "Test", archived: false }],
+      projects: [
+        { id: "p", name: "One", closed: false, defaultProjectCodeId: "test" },
+        { id: "q", name: "Two", closed: true, defaultProjectCodeId: "test" },
+      ],
+      records: [
+        { ...a, id: "a", minutes: 30, note: "Old description" },
+        {
+          ...a,
+          id: "b",
+          replaces: "a",
+          minutes: 45,
+          note: "Fixed report\nTested export",
+        },
+        { ...a, id: "c", minutes: 15, note: "" },
+        { ...a, id: "d", minutes: 60, note: "Updated docs" },
+        { ...a, id: "e", minutes: 10, note: "Removed" },
+        { type: "void" as const, id: "void", target: "e" },
+        {
+          ...a,
+          id: "f",
+          projectId: "q",
+          projectCodeId: "test",
+          minutes: 20,
+          note: "Other project",
+        },
+        { ...a, id: "g", date: "2026-10-02", minutes: 25, note: " \n\t" },
+        { ...a, id: "h", date: "2026-10-02", minutes: 5, note: "" },
+        {
+          ...a,
+          id: "outside",
+          date: "2026-10-03",
+          minutes: 500,
+          note: "Outside",
+        },
+      ],
+    };
+    const original = JSON.stringify(data);
+    const text = report(data, "2026-10-01", "2026-10-02");
+    expect(text).toContain(
+      `2026-10-01 [2h 00m] One\n    Fixed report\n    Tested export\n    Updated docs\n\n2026-10-01 [0h 20m] Two\n    Other project\n\n2026-10-02 [0h 30m] One\n`,
+    );
+    expect(text.match(/^2026-10-01 \[/gm)).toHaveLength(2);
+    expect(text).toContain("2026-10-01 [0h 20m] Two\n    Other project");
+    expect(text).toContain("Test [2h 50m]");
+    expect(text).toContain("Total: 2h 50m");
+    expect(text).not.toMatch(/Old description|Removed|Outside/);
+    expect(JSON.stringify(data)).toBe(original);
+  });
   it("offers calendar presets across month and year boundaries", () => {
     expect(reportRange("today", "2027-01-01")).toEqual([
       "2027-01-01",
@@ -174,28 +334,51 @@ describe("timesheet reports", () => {
       "2024-02-29",
     ]);
   });
-  it("includes daily project subtotals, empty days and a nonduplicated grand total", () => {
+  it("groups by day with project subtotals, aligned notes and a single grand total", () => {
     const text = report(
       {
         ...emptySnapshot,
+        projectCodes: [{ id: "test", label: "Test", archived: false }],
         projects: [
-          { id: "p", name: "One", closed: false },
-          { id: "q", name: "Two", closed: true },
+          { id: "p", name: "One", closed: false, defaultProjectCodeId: "test" },
+          { id: "q", name: "Two", closed: true, defaultProjectCodeId: "test" },
         ],
         records: [
           { ...a, id: "one", minutes: 45 },
-          { ...a, id: "two", projectId: "q", minutes: 30 },
+          {
+            ...a,
+            id: "two",
+            projectId: "q",
+            projectCodeId: "test",
+            minutes: 30,
+          },
           { ...a, id: "three", date: "2026-10-03", minutes: 90 },
           { ...a, id: "outside", date: "2026-10-04", minutes: 300 },
         ],
       },
       "2026-10-01",
       "2026-10-03",
+      "day",
     );
-    expect(text).toContain(
-      "## Daily totals\n\n2026-10-01 — 1h 15m\n  One — 45m\n  Two — 30m\n2026-10-02 — 0m\n2026-10-03 — 1h 30m\n  One — 1h 30m",
-    );
+    expect(text).toContain("## 2026-10-01 [1h 15m]\n\nTest [1h 15m]\n    One: First | task\n         Follow-up\n    Two: First | task\n         Follow-up");
+    expect(text).toContain("## 2026-10-03 [1h 30m]");
+    expect(text).not.toContain("Daily totals");
+    expect(text.match(/Total:/g)).toHaveLength(1);
     expect(text).toContain("Total: 2h 45m");
     expect(text).not.toContain("2026-10-04");
   });
+});
+
+ it("groups a task across codes and days and retains unknown code time", () => {
+  const data = {
+    ...emptySnapshot,
+    projects: [{ id: "p", name: "Task", closed: true, defaultProjectCodeId: "test" }],
+    projectCodes: [{ id: "test", label: "Project A", archived: true }],
+    records: [a, { ...a, id: "other", projectCodeId: "missing", date: "2026-10-02", minutes: 60, note: "" }],
+  };
+  const text = report(data, "2026-10-01", "2026-10-02", "task");
+  expect(text).toContain("## Task [1h 45m]\n\n2026-10-01 [0h 45m] Project A\n    First | task\n    Follow-up\n\n2026-10-02 [1h 00m] missing\n");
+  expect(text).not.toContain("Daily totals");
+  expect(report(data, "2026-10-01", "2026-10-02")).toContain("## missing [1h 00m]");
+  expect(report(emptySnapshot, "2026-10-01", "2026-10-02", "day")).toContain("Total: 0h 00m");
 });

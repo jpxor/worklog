@@ -14,14 +14,14 @@ afterEach(cleanup);
 const entry: Entry = {
   type: "entry",
   id: "one",
-  projectId: "p",
+  projectId: "p", projectCodeId: "test",
   date: "2026-10-17",
   minutes: 45,
   note: "Reviewed drawings",
 };
 const projects = [
-  { id: "p", name: "Design", closed: false },
-  { id: "q", name: "Admin", closed: false },
+  { id: "p", name: "Design", closed: false, defaultProjectCodeId: "test" },
+  { id: "q", name: "Admin", closed: false, defaultProjectCodeId: "test" },
 ];
 const base = () => ({
   entries: [entry],
@@ -39,7 +39,7 @@ describe("time details", () => {
         {...base()}
         entries={[
           entry,
-          { ...entry, id: "two", projectId: "q", minutes: 30 },
+          { ...entry, id: "two", projectId: "q", projectCodeId: "test", minutes: 30 },
           { ...entry, id: "old", date: "2026-10-16", note: "Yesterday only" },
         ]}
       />,
@@ -56,7 +56,7 @@ describe("time details", () => {
     fireEvent.change(screen.getByLabelText("Duration"), {
       target: { value: "1.5h" },
     });
-    fireEvent.change(screen.getByLabelText("Project"), {
+    fireEvent.change(screen.getByLabelText("Task"), {
       target: { value: "q" },
     });
     fireEvent.change(screen.getByLabelText(/Note/), {
@@ -65,7 +65,7 @@ describe("time details", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() =>
       expect(props.onSave).toHaveBeenCalledWith(
-        { ...entry, projectId: "q", minutes: 90, note: "Updated work" },
+        { ...entry, projectId: "q", projectCodeId: "test", minutes: 90, note: "Updated work" },
         entry,
       ),
     );
@@ -115,7 +115,7 @@ it("browses all projects by week and jumps to historical dates", () => {
       entries={[
         entry,
         { ...entry, id: "next", date: "2026-10-19", note: "Next week task" },
-        { ...entry, id: "other", projectId: "q", note: "Other project work" },
+        { ...entry, id: "other", projectId: "q", projectCodeId: "test", note: "Other project work" },
       ]}
     />,
   );

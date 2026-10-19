@@ -11,7 +11,7 @@ import ProjectOverview from "./ProjectOverview";
 import { noteTodos, setTodoChecked } from "./noteTodos";
 import type { Note } from "./model";
 afterEach(cleanup);
-const project = { id: "one", name: "One", closed: false };
+const project = { id: "one", name: "One", closed: false, defaultProjectCodeId: "test" };
 const note: Note = {
   path: "projects/one/notes/old.md",
   content: "# Log\n\n- [ ] Follow up\n- [x] Already done",

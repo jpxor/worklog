@@ -1,4 +1,10 @@
-import { useState, type DragEvent, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+} from "react";
 import ContextMenu from "./ContextMenu";
 import { ChevronDown, ChevronRight, FileText, Folder, Pin } from "lucide-react";
 import type { Note } from "./model";
@@ -9,6 +15,9 @@ export default function NoteTree({
   notes,
   folders,
   prefix,
+  workspace = "",
+  onNewNote,
+  onNewFolder,
   projectName = "Project root",
   active,
   onOpen,
@@ -22,10 +31,14 @@ export default function NoteTree({
   onPin,
   pinned = [],
   disabled = false,
+  defaultCollapsed = false,
 }: {
   notes: Note[];
   folders: string[];
   prefix: string;
+  workspace?: string;
+  onNewNote?: (folder: string) => void;
+  onNewFolder?: (folder: string) => void;
   projectName?: string;
   active: string;
   onOpen: (path: string) => void;
@@ -39,8 +52,22 @@ export default function NoteTree({
   onPin?: (path: string) => void;
   pinned?: string[];
   disabled?: boolean;
+  defaultCollapsed?: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const key = `worknotes.tree:${workspace}:${prefix}`;
+  const [collapsed, setCollapsed] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || "[]");
+      const paths: string[] = Array.isArray(saved) ? saved.filter((path): path is string => typeof path === "string") : [];
+      return defaultCollapsed ? [...new Set([...paths, prefix])] : paths;
+    } catch {
+      return defaultCollapsed ? [prefix] : [];
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(collapsed));
+  }, [key, collapsed]);
+  const hover = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   const [dragged, setDragged] = useState<string | null>(null);
   const [menu, setMenu] = useState<{
@@ -86,23 +113,29 @@ export default function NoteTree({
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = "move";
-      setTarget(folder);
+      if (target !== folder) setTarget(folder);
+      if (target !== folder && hover.current) clearTimeout(hover.current);
+      if (target !== folder && collapsed.includes(folder))
+        hover.current = setTimeout(
+          () => setCollapsed((c) => c.filter((p) => p !== folder)),
+          600,
+        );
     },
-    onDragLeave: () => setTarget(null),
+    onDragLeave: () => {
+      setTarget(null);
+      if (hover.current) clearTimeout(hover.current);
+    },
     onDrop: (event: DragEvent) => {
       if (!accepts(event)) return;
       event.preventDefault();
       event.stopPropagation();
       setTarget(null);
       setDragged(null);
+      if (hover.current) clearTimeout(hover.current);
       const source = event.dataTransfer.getData(noteType);
       if (
-        !notes.some(
-          (note) => note.path === source && source.startsWith(prefix + "/"),
-        ) &&
-        !folders.some(
-          (path) => path === source && path.startsWith(prefix + "/"),
-        )
+        !notes.some((note) => note.path === source) &&
+        !folders.some((path) => path === source)
       )
         return;
       const destination = `${folder}/${source.split("/").pop()}`;
@@ -110,8 +143,10 @@ export default function NoteTree({
         source !== destination &&
         !folder.startsWith(source + "/") &&
         folder !== source
-      )
+      ) {
+        setCollapsed((c) => c.filter((p) => p !== folder));
         onMove(source, destination);
+      }
       setCollapsed((current) => current.filter((path) => path !== folder));
     },
   });
@@ -182,28 +217,65 @@ export default function NoteTree({
   };
   return (
     <>
-      <button
-        className={`tree-folder tree-root ${overviewActive ? "selected" : ""} ${target === prefix ? "drop-target" : ""}`}
-        title="Open project overview · Drop a note here to move it to the project root"
-        onClick={onOverview}
-        onContextMenu={(event) => {
-          context(event, prefix, true);
-        }}
-        {...dropProps(prefix)}
-      >
-        <Folder size={14} />
-        {projectName}
-      </button>
-      <div className="pinned-notes">
-        {pinned
-          .filter(
-            (path) =>
-              path.startsWith(prefix + "/") &&
-              notes.some((note) => note.path === path),
-          )
-          .map((path) => renderFile(path, path.split("/").at(-1)!))}
+      <div className="tree-root-row">
+        <button
+          className="icon"
+          aria-label={`Toggle ${projectName}`}
+          aria-expanded={!collapsed.includes(prefix)}
+          onClick={() =>
+            setCollapsed((c) =>
+              c.includes(prefix)
+                ? c.filter((p) => p !== prefix)
+                : [...c, prefix],
+            )
+          }
+        >
+          {collapsed.includes(prefix) ? (
+            <ChevronRight size={13} />
+          ) : (
+            <ChevronDown size={13} />
+          )}
+        </button>
+        <button
+          data-note-root={prefix === "global/notes" ? "global" : "task"}
+          className={`tree-folder tree-root ${overviewActive ? "selected" : ""} ${target === prefix ? "drop-target" : ""}`}
+          title={`Open ${projectName} overview · Drop here to move to ${projectName}${prefix === "global/notes" ? " · Available in every task in this workspace" : ""}`}
+          onClick={onOverview}
+          onContextMenu={(event) => {
+            context(event, prefix, true);
+          }}
+          {...dropProps(prefix)}
+        >
+          <Folder size={14} />
+          {projectName}
+        </button>
       </div>
-      {render(prefix)}
+      {target && (
+        <small role="status">
+          Move to {projectName}
+          {target === prefix ? "" : " / " + target.slice(prefix.length + 1)}
+        </small>
+      )}
+      {!collapsed.includes(prefix) && (
+        <>
+          <div className="pinned-notes">
+            {pinned
+              .filter(
+                (path) =>
+                  path.startsWith(prefix + "/") &&
+                  notes.some((note) => note.path === path),
+              )
+              .map((path) => renderFile(path, path.split("/").at(-1)!))}
+          </div>
+          {render(prefix)}
+          {!paths.some((path) => path.startsWith(prefix + "/")) && onNewNote && (
+            <button className="empty-note" disabled={disabled} onClick={() => onNewNote(prefix)}>
+              <FileText size={14} />
+              Write your first note
+            </button>
+          )}
+        </>
+      )}
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -211,6 +283,33 @@ export default function NoteTree({
           label={menu.folder ? "Folder actions" : "Note actions"}
           onClose={() => setMenu(null)}
           actions={[
+            ...(menu.folder && onNewNote
+              ? [
+                  {
+                    label: "New note",
+                    run: () => onNewNote(menu.path),
+                    disabled,
+                  },
+                ]
+              : []),
+            ...(menu.folder && onNewFolder
+              ? [
+                  {
+                    label: "New folder",
+                    run: () => onNewFolder(menu.path),
+                    disabled,
+                  },
+                ]
+              : []),
+            ...(menu.folder && menu.path !== prefix && onMoveProject
+              ? [
+                  {
+                    label: "Move…",
+                    run: () => onMoveProject(menu.path),
+                    disabled,
+                  },
+                ]
+              : []),
             ...(!menu.folder
               ? [
                   {
@@ -221,7 +320,7 @@ export default function NoteTree({
                   ...(onMoveProject
                     ? [
                         {
-                          label: "Move to another project…",
+                          label: "Move…",
                           run: () => onMoveProject(menu.path),
                           disabled,
                         },

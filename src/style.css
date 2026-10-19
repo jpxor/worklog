@@ -872,10 +872,11 @@ kbd {
   color: #9aa18c;
   font-size: 10px;
 }
-.popup {
+.time-panel.popup {
   border-radius: 10px;
   max-height: 90vh;
-  width: 350px;
+  width: 480px;
+  max-width: calc(100vw - 60px);
   box-shadow: 0 15px 60px #22301b25;
 }
 .popup .time-body {
@@ -1512,3 +1513,64 @@ kbd {
 .mcp-settings fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 12px; }
 .mcp-settings > label, .mcp-settings fieldset > label { display: grid; gap: 6px; margin: 10px 0; }
 .mcp-settings .settings-actions { flex-wrap: wrap; }
+.mcp-settings fieldset > label.mcp-http-option { display: flex; align-items: center; gap: 8px; }
+.mcp-settings .mcp-http-option input { width: auto; margin: 0; padding: 0; }
+
+/* Scope remains readable in compact layouts. */
+.tree-root-row { display:flex; align-items:center; min-height:32px; }
+.tree-root-row > .tree-root { flex:1; }
+.breadcrumb { flex-wrap:wrap; min-height:32px; height:auto; }
+.breadcrumb > span:first-child { flex-shrink:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.tab small { flex-shrink:0; font-size:11px; opacity:.8; }
+.tab:has(small) + .tab:not(:has(small)) { border-left:2px solid var(--border); }
+.time-body label > div { min-width:0; }
+.global-overview button, .tree-root-row button { min-height:28px; }
+
+.report-grouping { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.report-grouping button[aria-pressed="true"] { background: #496345; color: white; }
+
+.create-note-modal { width: 440px; max-width: calc(100vw - 40px); }
+.create-note-form { display: flex; flex-direction: column; gap: 18px; }
+.create-note-form label { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.create-note-form input, .create-note-form select { width: 100%; min-height: 38px; }
+.create-note-form .settings-actions { justify-content: flex-end; gap: 10px; margin-top: 4px; padding-top: 16px; border-top: 1px solid #e2e5d9; }
+.create-note-form [role="alert"] { margin: 0; }
+.time-history-action { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; min-height: 36px; }
+
+.create-note-form select { font: inherit; color: #30382f; background: #fffefa; border: 1px solid #dddfd4; border-radius: 6px; padding: 10px 11px; outline: none; }
+.create-note-form select:focus { border-color: #7e9374; box-shadow: 0 0 0 3px #7e937415; }
+
+/* Keep the editor's search controls compact instead of inheriting form-field sizing. */
+.cm-panel.cm-search {
+  padding: 8px 28px 8px 12px;
+}
+.cm-panel.cm-search .cm-textfield {
+  width: 240px;
+  max-width: 100%;
+  padding: 5px 8px;
+}
+.cm-panel.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.cm-panel.cm-search input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.time-entry-form { display: flex; flex-direction: column; gap: 16px; }
+.time-body .time-entry-form > label { margin-bottom: 0; }
+.time-entry-fields { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; gap: 12px; }
+.time-entry-fields > * { min-width: 0; }
+.time-field-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 18px; margin-bottom: 7px; font-size: 12px; font-weight: 550; }
+.time-field-heading .text-button { padding: 0; font-weight: 400; font-size: 10px; line-height: 18px; }
+.time-entry-fields > label { line-height: 18px; }
+.time-entry-fields input { min-width: 0; }
+.time-entry-fields > label > input { display: block; }
+.time-entry-form > label > div { margin-top: 7px; }

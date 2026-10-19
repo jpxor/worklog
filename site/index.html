@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="WorkLog is a desktop app for project notes and time tracking, with plain-text data storage, Markdown timesheets, and scheduled backups.">
-  <title>WorkLog — Project notes and time tracking</title>
+  <meta name="description" content="WorkLog is a desktop app for task and global notes and time tracking, with plain-text data storage, Markdown timesheets, and scheduled backups.">
+  <title>WorkLog — Task and global notes and time tracking</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,8 +18,8 @@
   <main>
     <section class="intro" aria-labelledby="intro-title">
       <p class="eyebrow">Windows &amp; Linux desktop app</p>
-      <h1 id="intro-title">Project notes and time tracking, <br>stored in local files.</h1>
-      <p class="lead">Write daily logs, keep notes by project, and record the time you spend. Export timesheets when you need them. Your notes and time records stay in a folder you choose.</p>
+      <h1 id="intro-title">Task and global notes and time tracking, <br>stored in local files.</h1>
+      <p class="lead">Write daily logs, keep notes by task, and record the time you spend. Export timesheets when you need them. Your notes and time records stay in a folder you choose.</p>
       <div class="actions">
         <a class="button" href="https://github.com/jpxor/worklog/releases/latest">Download the latest release <span aria-hidden="true">↓</span></a>
         <a href="#data">Storage &amp; backups <span aria-hidden="true">↘</span></a>
@@ -27,15 +27,15 @@
       <p class="download-note">Windows x64 installer · Linux x86-64 DEB &amp; AppImage · Standalone binaries<br>Downloads and documentation require repository access while the project is private.</p>
     </section>
     <figure class="workspace">
-      <img src="assets/workspace.png" alt="WorkLog project overview with notes, unfinished tasks, and a time-entry panel" width="1400" height="950">
-      <figcaption>Project overview in light appearance. Preview shown with sample data.</figcaption>
+      <img src="assets/workspace.png" alt="WorkLog task overview with notes, unfinished tasks, and a time-entry panel" width="1400" height="950">
+      <figcaption>Task overview in light appearance. Preview shown with sample data.</figcaption>
     </figure>
     <section class="features" aria-labelledby="features-title">
       <h2 id="features-title">Working in WorkLog</h2>
       <dl>
-        <div><dt>Notes by project</dt><dd>Organize Markdown and text notes in folders, create dated daily logs, and keep several notes open in tabs. View images, PDFs, and Mermaid diagrams alongside your writing.</dd></div>
-        <div><dt>Tasks and search</dt><dd>Find unfinished Markdown checkboxes in the project overview. Search note text across projects, including closed projects, and jump to matching lines.</dd></div>
-        <div><dt>Time and timesheets</dt><dd>Enter a duration or copy elapsed time from the timer. Correct earlier entries, review daily and project totals, and export a date range as Markdown.</dd></div>
+        <div><dt>Notes by task</dt><dd>Organize Markdown and text notes in folders, create dated daily logs, and keep several notes open in tabs. View images, PDFs, and Mermaid diagrams alongside your writing.</dd></div>
+        <div><dt>Tasks and search</dt><dd>Find unfinished Markdown checkboxes in the task overview. Search note text across tasks, including closed tasks, and jump to matching lines.</dd></div>
+        <div><dt>Time and timesheets</dt><dd>Enter a duration or copy elapsed time from the timer. Select or create a project code inline. Correct earlier entries, review daily and project-code totals, and export a date range as Markdown.</dd></div>
       </dl>
     </section>
     <section class="data" id="data" aria-labelledby="data-title">
@@ -48,7 +48,7 @@
     </section>
     <section class="assistant" aria-labelledby="assistant-title">
       <h2 id="assistant-title">Ask an assistant about your work</h2>
-      <p>Connect a compatible assistant through the read-only MCP endpoint to search saved notes, retrieve time entries, and inspect Git history. Use those records to summarize a period of work or draft a review. Sharing is off at launch; you start it in Settings. Authentication is required, with TLS for network connections.</p>
+      <p>Connect a compatible assistant through the read-only MCP endpoint to search saved notes, retrieve time entries, and inspect Git history. Use those records to summarize a period of work or draft a review. Sharing is off at launch; you start it in Settings. Authentication is required, with TLS for network connections unless you explicitly allow HTTP on a trusted private network.</p>
       <a href="https://github.com/jpxor/worklog/blob/main/docs/mcp.md">Connection guide ↗</a>
     </section>
   </main>

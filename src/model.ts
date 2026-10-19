@@ -2,8 +2,15 @@ export interface Project {
   id: string;
   name: string;
   closed: boolean;
+  defaultProjectCodeId: string;
+}
+export interface ProjectCode {
+  id: string;
+  label: string;
+  archived: boolean;
 }
 export interface Note {
+  scope?: "task" | "global";
   path: string;
   content: string;
   kind?: "image" | "pdf";
@@ -14,6 +21,7 @@ export interface Entry {
   type: "entry";
   id: string;
   projectId: string;
+  projectCodeId: string;
   date: string;
   minutes: number;
   note: string;
@@ -28,6 +36,7 @@ export type Record = Entry | Void;
 export interface Snapshot {
   root: string;
   projects: Project[];
+  projectCodes: ProjectCode[];
   notes: Note[];
   records: Record[];
   folders: string[];
@@ -42,6 +51,7 @@ export interface Snapshot {
 export const emptySnapshot: Snapshot = {
   root: "",
   projects: [],
+  projectCodes: [],
   notes: [],
   records: [],
   folders: [],
@@ -119,6 +129,7 @@ export function effective(records: Record[]): Entry[] {
     if (r.type === "entry") {
       if (
         !r.projectId ||
+        !r.projectCodeId ||
         !validDate(r.date) ||
         !Number.isSafeInteger(r.minutes) ||
         r.minutes <= 0 ||
@@ -149,53 +160,131 @@ export function dailyTotals(
   }
   return totals;
 }
-export function report(data: Snapshot, from: string, through: string) {
+export type ReportGrouping = "project" | "day" | "task";
+export function report(
+  data: Snapshot,
+  from: string,
+  through: string,
+  grouping: ReportGrouping = "project",
+) {
   if (!validDate(from) || !validDate(through) || from > through)
     throw new Error("Choose a valid date range");
   const entries = effective(data.records)
     .filter((e) => e.date >= from && e.date <= through)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-  const hourWidth = entries.reduce(
-    (width, e) => Math.max(width, String(Math.floor(e.minutes / 60)).length),
-    1,
+  const grouped = new Map<
+    string,
+    {
+      projectId: string;
+      projectCodeId: string;
+      date: string;
+      minutes: number;
+      notes: string[];
+    }
+  >();
+  for (const entry of entries) {
+    const key = JSON.stringify([
+      entry.projectCodeId,
+      entry.projectId,
+      entry.date,
+    ]);
+    let row = grouped.get(key);
+    if (!row) {
+      row = {
+        projectCodeId: entry.projectCodeId,
+        projectId: entry.projectId,
+        date: entry.date,
+        minutes: 0,
+        notes: [],
+      };
+      grouped.set(key, row);
+    }
+    row.minutes += entry.minutes;
+    row.notes.push(entry.note);
+  }
+  const dailyEntries = [...grouped.values()];
+  const time = (minutes: number) =>
+    `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  const total = (rows: typeof dailyEntries) =>
+    time(rows.reduce((sum, row) => sum + row.minutes, 0));
+  const singleLine = (value: string) => value.replace(/[\r\n]/g, " ");
+  const taskName = (id: string) =>
+    singleLine(data.projects.find((task) => task.id === id)?.name || id);
+  const codeName = (id: string) =>
+    singleLine(data.projectCodes.find((code) => code.id === id)?.label || id);
+  const notes = (row: (typeof dailyEntries)[number]) =>
+    row.notes
+      .flatMap((note) => note.split(/\r?\n/))
+      .map((line) => line.trimEnd())
+      .filter((line) => line.trim().length > 0);
+  const codes = [...new Set(dailyEntries.map((row) => row.projectCodeId))].sort(
+    (a, b) => codeName(a).localeCompare(codeName(b)) || a.localeCompare(b),
   );
-  let out = `# Time report: ${from} – ${through}\n\nDates inclusive. Durations shown in hours and minutes.\n`;
-  for (const p of [...data.projects].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  )) {
-    const rows = entries.filter((e) => e.projectId === p.id);
-    if (!rows.length) continue;
-    out += `\n## ${p.name.replace(/[\r\n]/g, " ")} — ${formatTime(rows.reduce((n, e) => n + e.minutes, 0))}\n\n`;
-    for (const e of rows) {
-      const hours = String(Math.floor(e.minutes / 60)).padStart(hourWidth, " ");
-      const minutes = String(e.minutes % 60).padStart(2, "0");
-      const prefix = `${e.date} | ${hours}h ${minutes}m | `;
-      const note = e.note
-        .split(/\r?\n/)
-        .map((line) => line.trimEnd())
-        .filter((line) => line.trim().length > 0)
-        .join(`\n${" ".repeat(prefix.length)}`);
-      out += `${prefix}${note}`.trimEnd() + "\n";
+  const tasks = [...new Set(dailyEntries.map((row) => row.projectId))].sort(
+    (a, b) => taskName(a).localeCompare(taskName(b)) || a.localeCompare(b),
+  );
+  const dates = [...new Set(dailyEntries.map((row) => row.date))].sort();
+  const blocks = [
+    `# Time report — by ${grouping}\n${from} to ${through}\nTotal: ${total(dailyEntries)}`,
+  ];
+  if (grouping === "day") {
+    for (const date of dates) {
+      const dayRows = dailyEntries.filter((row) => row.date === date);
+      blocks.push(`## ${date} [${total(dayRows)}]`);
+      for (const code of codes) {
+        const rows = dayRows
+          .filter((row) => row.projectCodeId === code)
+          .sort(
+            (a, b) =>
+              taskName(a.projectId).localeCompare(taskName(b.projectId)) ||
+              a.projectId.localeCompare(b.projectId),
+          );
+        if (!rows.length) continue;
+        const lines = [`${codeName(code)} [${total(rows)}]`];
+        for (const row of rows) {
+          const name = taskName(row.projectId);
+          const text = notes(row);
+          lines.push(`    ${name}${text.length ? ": " + text[0] : ""}`);
+          for (const line of text.slice(1))
+            lines.push(" ".repeat(4 + name.length + 2) + line);
+        }
+        blocks.push(lines.join("\n"));
+      }
+    }
+  } else {
+    for (const id of grouping === "project" ? codes : tasks) {
+      const rows = dailyEntries
+        .filter(
+          (row) =>
+            (grouping === "project" ? row.projectCodeId : row.projectId) === id,
+        )
+        .sort(
+          (a, b) =>
+            a.date.localeCompare(b.date) ||
+            (grouping === "project"
+              ? taskName(a.projectId).localeCompare(taskName(b.projectId))
+              : codeName(a.projectCodeId).localeCompare(
+                  codeName(b.projectCodeId),
+                )) ||
+            a.projectId.localeCompare(b.projectId) ||
+            a.projectCodeId.localeCompare(b.projectCodeId),
+        );
+      blocks.push(
+        `## ${grouping === "project" ? codeName(id) : taskName(id)} [${total(rows)}]`,
+      );
+      for (const row of rows) {
+        const name =
+          grouping === "project"
+            ? taskName(row.projectId)
+            : codeName(row.projectCodeId);
+        blocks.push(
+          [
+            `${row.date} [${time(row.minutes)}] ${name}`,
+            ...notes(row).map((line) => `    ${line}`),
+          ].join("\n"),
+        );
+      }
     }
   }
-  out += "\n## Daily totals\n\n";
-  // Include zero-entry days so gaps in a timesheet are visible.
-  for (let date = from; date <= through;) {
-    const rows = entries.filter((e) => e.date === date);
-    out += `${date} — ${formatTime(rows.reduce((n, e) => n + e.minutes, 0))}\n`;
-    for (const project of [...data.projects].sort((a, b) =>
-      a.name.localeCompare(b.name),
-    )) {
-      const minutes = rows
-        .filter((e) => e.projectId === project.id)
-        .reduce((n, e) => n + e.minutes, 0);
-      if (minutes)
-        out += `  ${project.name.replace(/[\r\n]/g, " ")} — ${formatTime(minutes)}\n`;
-    }
-    if (date === through) break;
-    const next = new Date(date + "T12:00:00Z");
-    next.setUTCDate(next.getUTCDate() + 1);
-    date = next.toISOString().slice(0, 10);
-  }
-  return `${out}\nTotal: ${formatTime(entries.reduce((n, e) => n + e.minutes, 0))}\n`;
+  return blocks.join("\n\n") + "\n";
 }

@@ -10,10 +10,10 @@ function setup() {
   render(
     <ProjectCombo
       projects={[
-        { id: "a", name: "Alpha", closed: false },
-        { id: "b", name: "Beta", closed: false },
-        { id: "c", name: "Gamma", closed: false },
-        { id: "d", name: "Closed", closed: true },
+        { id: "a", name: "Alpha", closed: false, defaultProjectCodeId: "test" },
+        { id: "b", name: "Beta", closed: false, defaultProjectCodeId: "test" },
+        { id: "c", name: "Gamma", closed: false, defaultProjectCodeId: "test" },
+        { id: "d", name: "Closed", closed: true, defaultProjectCodeId: "test" },
       ]}
       value="a"
       onPick={onPick}
@@ -23,7 +23,7 @@ function setup() {
   return {
     onPick,
     onCreate,
-    input: screen.getByRole("combobox", { name: "Project" }),
+    input: screen.getByRole("combobox", { name: "Task" }),
   };
 }
 it("reopens after mouse selection without requiring the input to lose focus", () => {
@@ -35,7 +35,7 @@ it("reopens after mouse selection without requiring the input to lose focus", ()
   fireEvent.click(input);
   expect(screen.getByRole("option", { name: "Gamma" })).toBeTruthy();
   fireEvent.click(screen.getByRole("option", { name: "Gamma" }));
-  fireEvent.click(screen.getByRole("button", { name: "Toggle project list" }));
+  fireEvent.click(screen.getByRole("button", { name: "Toggle task list" }));
   expect(screen.getByRole("listbox")).toBeTruthy();
 });
 it("navigates filtered projects with arrows and Enter, including upward wrapping", () => {

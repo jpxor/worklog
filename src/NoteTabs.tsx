@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { isGlobalTab } from "./taskSessions";
+import { useEffect, useState } from "react";
 import { Folder, X } from "lucide-react";
 import { overviewProjectId } from "./noteTodos";
 import type { Project } from "./model";
@@ -32,6 +33,11 @@ export default function NoteTabs({
     x: number;
     y: number;
   } | null>(null);
+  useEffect(() => {
+    document
+      .querySelector(".tab.active")
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [active]);
   return (
     <>
       {tabs.map((path) => (
@@ -81,7 +87,7 @@ export default function NoteTabs({
             onClick={() => onOpen(path)}
             title={
               overviewProjectId(path)
-                ? "Project overview"
+                ? "Task overview"
                 : path.split("/").slice(3).join("/")
             }
           >
@@ -90,9 +96,12 @@ export default function NoteTabs({
             ) : (
               <FileIcon path={path} size={14} />
             )}
-            {overviewProjectId(path)
-              ? `${projects.find((p) => p.id === overviewProjectId(path))?.name || "Project"} · Overview`
-              : path.split("/").at(-1)}
+            {isGlobalTab(path) && <small>Global · </small>}
+            {path === "global:overview"
+              ? "Overview"
+              : overviewProjectId(path)
+                ? `${projects.find((p) => p.id === overviewProjectId(path))?.name || "Task"} · Overview`
+                : path.split("/").at(-1)}
           </button>
           <button
             className="icon"
@@ -110,7 +119,7 @@ export default function NoteTabs({
           label="Tab actions"
           onClose={() => setMenu(null)}
           actions={[
-            ...(!overviewProjectId(menu.path)
+            ...(menu.path !== "global:overview" && !overviewProjectId(menu.path)
               ? [
                   {
                     label: "Rename / move…",

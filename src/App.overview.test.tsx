@@ -19,6 +19,7 @@ vi.mock("./api", () => ({
   confirmAction: vi.fn(),
 }));
 import App from "./App";
+import { exportFile } from "./api";
 import { emptySnapshot, today, reportRange, type Snapshot } from "./model";
 const path = "projects/p/notes/log.md";
 let data: Snapshot;
@@ -36,8 +37,9 @@ beforeEach(() => {
   file = "# Log\n\n- [ ] Follow up\n";
   data = {
     ...emptySnapshot,
+    projectCodes: [{id:"test",label:"Test",archived:false}],
     root: "test-workspace",
-    projects: [{ id: "p", name: "One", closed: false }],
+    projects: [{ id: "p", name: "One", closed: false, defaultProjectCodeId: "test" }],
     notes: [{ path, content: file, modified: 100 }],
   };
   mocks.request
@@ -70,17 +72,43 @@ async function openOverview() {
   await waitFor(() =>
     expect(
       screen.getByTitle(
-        "Open project overview · Drop a note here to move it to the project root",
+        "Open One overview · Drop here to move to One",
       ).textContent,
     ).toBe("One"),
   );
   fireEvent.click(
     screen.getByTitle(
-      "Open project overview · Drop a note here to move it to the project root",
+      "Open One overview · Drop here to move to One",
     ),
   );
-  return screen.findByRole("region", { name: "One project overview" });
+  return screen.findByRole("region", { name: "One task overview" });
 }
+it("retains an explicitly selected time-entry task and its default code while another task is open", async () => {
+  data = {
+    ...data,
+    projectCodes: [...data.projectCodes, { id: "support", label: "SUPPORT", archived: false }],
+    projects: [...data.projects, { id: "q", name: "Two", closed: false, defaultProjectCodeId: "support" }],
+  };
+  const { container } = render(<App />);
+  await openOverview();
+  const form = within(container.querySelector(".time-panel form") as HTMLElement);
+  const taskPicker = form.getByRole("combobox", { name: "Task" }) as HTMLInputElement;
+  await waitFor(() => expect(taskPicker.value).toBe("One"));
+  fireEvent.focus(taskPicker);
+  fireEvent.click(form.getByRole("option", { name: "Two" }));
+  await waitFor(() => {
+    expect(taskPicker.value).toBe("Two");
+    expect((form.getByRole("combobox", { name: "Project code" }) as HTMLInputElement).value).toBe("SUPPORT");
+  });
+  expect(screen.getByRole("region", { name: "One task overview" })).toBeTruthy();
+  expect(screen.queryByText(/Time entry is still for/)).toBeNull();
+  expect(form.getByRole("button", { name: "Use current task" })).toBeTruthy();
+  expect(form.getByText("Task default")).toBeTruthy();
+  fireEvent.click(form.getByRole("button", { name: "Use current task" }));
+  await waitFor(() => expect(taskPicker.value).toBe("One"));
+  expect((form.getByRole("combobox", { name: "Project code" }) as HTMLInputElement).value).toBe("Test");
+  expect(form.queryByRole("button", { name: "Use current task" })).toBeNull();
+});
 it("opens one overview tab, saves a checkbox to its source, and jumps into the checked note", async () => {
   const { container } = render(<App />);
   await openOverview();
@@ -97,16 +125,17 @@ it("opens one overview tab, saves a checkbox to its source, and jumps into the c
       "[x] Follow up",
     ),
   );
+  await waitFor(()=>expect(container.querySelector(".cm-editor")).toBeTruthy());
   const editor = EditorView.findFromDOM(
     container.querySelector(".cm-editor")!,
   )!;
   expect(editor.state.selection.main.head).toBe(file.indexOf("[x]"));
   fireEvent.click(
     screen.getByTitle(
-      "Open project overview · Drop a note here to move it to the project root",
+      "Open One overview · Drop here to move to One",
     ),
   );
-  await screen.findByRole("region", { name: "One project overview" });
+  await screen.findByRole("region", { name: "One task overview" });
   expect(
     screen.getAllByRole("button", { name: "One · Overview" }),
   ).toHaveLength(1);
@@ -119,6 +148,7 @@ it("flushes a pending editor draft before constructing the overview", async () =
   await waitFor(() =>
     expect(container.querySelector(".cm-editor")).toBeTruthy(),
   );
+  await waitFor(()=>expect(container.querySelector(".cm-editor")).toBeTruthy());
   const editor = EditorView.findFromDOM(
     container.querySelector(".cm-editor")!,
   )!;
@@ -127,10 +157,10 @@ it("flushes a pending editor draft before constructing the overview", async () =
   });
   fireEvent.click(
     screen.getByTitle(
-      "Open project overview · Drop a note here to move it to the project root",
+      "Open One overview · Drop here to move to One",
     ),
   );
-  await screen.findByRole("region", { name: "One project overview" });
+  await screen.findByRole("region", { name: "One task overview" });
   expect(file).toContain("- [ ] Draft item");
   expect(screen.getByRole("checkbox", { name: /Draft item/ })).toBeTruthy();
 });
@@ -175,7 +205,7 @@ it("waits for a checkbox save before opening its source from the tree", async ()
 
 it("refreshes an empty legacy time draft to local today and preserves an explicit historical date", async () => {
   localStorage.setItem(
-    "worknotes.draft",
+    "worknotes.draft.v3:test-workspace",
     JSON.stringify({ date: "2026-01-01", project: "p", time: "", note: "" }),
   );
   const { container, unmount } = render(<App />);
@@ -239,7 +269,7 @@ it("advances the automatic work date across local midnight", async () => {
 it("searches note contents across projects including closed projects and opens the match", async () => {
   const closedPath = "projects/q/notes/history/closed.txt";
   const content = "Old work\nA significant outcome";
-  data.projects.push({ id: "q", name: "Archived", closed: true });
+  data.projects.push({ id: "q", name: "Archived", closed: true, defaultProjectCodeId: "test" });
   data.notes.push({ path: closedPath, content });
   const { container } = render(<App />);
   await openOverview();
@@ -258,13 +288,14 @@ it("searches note contents across projects including closed projects and opens t
       "significant outcome",
     ),
   );
+  await waitFor(()=>expect(container.querySelector(".cm-editor")).toBeTruthy());
   const editor = EditorView.findFromDOM(
     container.querySelector(".cm-editor") as HTMLElement,
   )!;
   expect(editor.state.selection.main.head).toBe(content.indexOf("significant"));
   expect(
     screen.getByTitle(
-      "Open project overview · Drop a note here to move it to the project root",
+      "Open Archived overview · Drop here to move to Archived",
     ).textContent,
   ).toBe("Archived");
 });
@@ -273,6 +304,7 @@ it("searches an unsaved note draft and jumps within its already open editor", as
   const { container } = render(<App />);
   await openOverview();
   fireEvent.click(screen.getByRole("button", { name: "Follow up" }));
+  await waitFor(()=>expect(container.querySelector(".cm-editor")).toBeTruthy());
   const editor = EditorView.findFromDOM(
     container.querySelector(".cm-editor") as HTMLElement,
   )!;
@@ -292,9 +324,7 @@ it("searches an unsaved note draft and jumps within its already open editor", as
       { name: /log.md/ },
     ),
   );
-  expect(editor.state.selection.main.head).toBe(
-    editor.state.doc.toString().indexOf("discovery"),
-  );
+  await waitFor(()=>expect(editor.state.selection.main.head).toBe(editor.state.doc.toString().indexOf("discovery")));
 });
 
 it("suggests a selected daily filename, accepts Enter, then reopens today's existing log", async () => {
@@ -316,7 +346,7 @@ it("suggests a selected daily filename, accepts Enter, then reopens today's exis
   await waitFor(() =>
     expect(container.querySelector(".cm-content")).toBeTruthy(),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Today's log" }));
+  fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
   expect(screen.queryByRole("dialog", { name: "Note name" })).toBeNull();
   expect(
     mocks.request.mock.calls.filter(([action]) => action === "create_note"),
@@ -326,7 +356,7 @@ it("suggests a selected daily filename, accepts Enter, then reopens today's exis
 it("lets the user replace the daily note's suggested name", async () => {
   render(<App />);
   await openOverview();
-  fireEvent.click(screen.getByRole("button", { name: "Today's log" }));
+  fireEvent.keyDown(window, { key: "D", ctrlKey: true, shiftKey: true });
   const input = screen.getByRole("textbox", { name: "Note name" });
   fireEvent.change(input, { target: { value: "meetings/planning" } });
   fireEvent.submit(input.closest("form")!);
@@ -337,12 +367,12 @@ it("lets the user replace the daily note's suggested name", async () => {
   );
 });
 
-it("applies timesheet presets and updates the preview's daily totals", async () => {
+it("applies timesheet presets and switches report grouping", async () => {
   data.records = [
     {
       type: "entry",
       id: "time",
-      projectId: "p",
+      projectId: "p", projectCodeId: "test",
       date: today(),
       minutes: 45,
       note: "Work",
@@ -360,8 +390,21 @@ it("applies timesheet presets and updates the preview's daily totals", async () 
     (within(dialog).getByLabelText("Through") as HTMLInputElement).value,
   ).toBe(today());
   expect(dialog.querySelector(".report-preview")?.textContent).toContain(
-    "## Daily totals\n\n" + today() + " — 45m",
+    "# Time report — by project",
   );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Day" }));
+  expect(dialog.querySelector(".report-preview")?.textContent).toContain("## " + today() + " [0h 45m]");
+  expect(localStorage.getItem("worknotes.reportGrouping")).toBe('"day"');
+  fireEvent.click(within(dialog).getByRole("button", { name: "Task" }));
+  expect(dialog.querySelector(".report-preview")?.textContent).toContain("## One [0h 45m]");
+  expect((within(dialog).getByLabelText("From") as HTMLInputElement).value).toBe(today());
+  const preview = dialog.querySelector(".report-preview")?.textContent;
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Copy" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(preview));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Export Markdown" }));
+  await waitFor(() => expect(exportFile).toHaveBeenCalledWith(preview, today(), today()));
   fireEvent.click(within(dialog).getByRole("button", { name: "Last week" }));
   const [from, through] = reportRange("lastWeek");
   expect(
@@ -370,6 +413,16 @@ it("applies timesheet presets and updates the preview's daily totals", async () 
   expect(
     (within(dialog).getByLabelText("Through") as HTMLInputElement).value,
   ).toBe(through);
+});
+
+it("restores the saved report grouping", async () => {
+  localStorage.setItem("worknotes.reportGrouping", '"day"');
+  render(<App />);
+  await openOverview();
+  fireEvent.click(screen.getByRole("button", { name: "Reports" }));
+  const dialog = screen.getByRole("dialog", { name: "report" });
+  expect(within(dialog).getByRole("button", { name: "Day" }).getAttribute("aria-pressed")).toBe("true");
+  expect(dialog.querySelector(".report-preview")?.textContent).toContain("by day");
 });
 
 it("pages content-search results without hiding the number of remaining notes", async () => {
@@ -381,7 +434,7 @@ it("pages content-search results without hiding the number of remaining notes", 
   await waitFor(() =>
     expect(
       screen.getByTitle(
-        "Open project overview · Drop a note here to move it to the project root",
+        "Open One overview · Drop here to move to One",
       ).textContent,
     ).toBe("One"),
   );
@@ -394,4 +447,88 @@ it("pages content-search results without hiding the number of remaining notes", 
   expect(within(dialog).queryByText("50.md")).toBeNull();
   fireEvent.click(within(dialog).getByText("Show more (1 remaining)"));
   expect(within(dialog).getByText("50.md")).toBeTruthy();
+});
+
+it("shows only the global and task roots in order, with global notes initially collapsed", async () => {
+  data.notes.push({ path: "global/notes/shared.md", content: "Shared reference" });
+  localStorage.setItem("worknotes.tree:test-workspace:global/notes", "[]");
+  const { container, unmount } = render(<App />);
+  await openOverview();
+  const roots = container.querySelectorAll(".tree-root-row .tree-root");
+  expect([...roots].map((root) => root.textContent)).toEqual(["Global notes", "One"]);
+  expect(container.querySelector(".sidebar-section")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Today's log" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "shared" })).toBeNull();
+  const toggle = screen.getByRole("button", { name: "Toggle Global notes" });
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(toggle);
+  expect(screen.getByRole("button", { name: "shared" })).toBeTruthy();
+  unmount();
+  render(<App />);
+  await openOverview();
+  expect(screen.getByRole("button", { name: "Toggle Global notes" }).getAttribute("aria-expanded")).toBe("false");
+});
+
+it("suggests the date for the first global note and creates it from the root menu", async () => {
+  render(<App />);
+  await openOverview();
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
+  const dialog = screen.getByRole("dialog", { name: "Create note" });
+  const input = within(dialog).getByRole("textbox", { name: "Note name" }) as HTMLInputElement;
+  expect(input.value).toBe(today());
+  expect(input.selectionStart).toBe(0);
+  expect(input.selectionEnd).toBe(input.value.length);
+  expect((within(dialog).getByLabelText("Create in") as HTMLSelectElement).value).toBe("global");
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_note", { path: "global/notes/" + today() + ".md" }));
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
+  expect((screen.getByRole("textbox", { name: "Note name" }) as HTMLInputElement).value).toBe("");
+});
+
+it("creates folders from a root menu and keeps a custom name when changing note ownership", async () => {
+  render(<App />);
+  await openOverview();
+  fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "New folder" }));
+  const dialog = screen.getByRole("dialog", { name: "Create folder" });
+  const input = within(dialog).getByRole("textbox", { name: "Folder name" });
+  expect((input as HTMLInputElement).value).toBe("");
+  fireEvent.change(input, { target: { value: "Reference" } });
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_folder", { path: "global/notes/Reference" }));
+  fireEvent.keyDown(window, { key: "n", ctrlKey: true });
+  const name = screen.getByRole("textbox", { name: "Note name" });
+  fireEvent.change(name, { target: { value: "Meeting notes" } });
+  fireEvent.change(screen.getByLabelText("Create in"), { target: { value: "global" } });
+  expect((name as HTMLInputElement).value).toBe("Meeting notes");
+});
+
+it("puts time history in the log time panel instead of recent entries or the toolbar", async () => {
+  const { container } = render(<App />);
+  await openOverview();
+  const history = screen.getByRole("button", { name: "Time history" });
+  expect(history.closest(".time-panel")).toBeTruthy();
+  expect(container.querySelector(".recent-entries")).toBeNull();
+  expect(screen.queryByText(/Recent entries/)).toBeNull();
+  fireEvent.click(history);
+  expect(screen.getByRole("dialog", { name: "timeHistory" })).toBeTruthy();
+});
+
+it("shows Use today only for another date and preserves the time draft when resetting it", async () => {
+  const { container } = render(<App />);
+  await openOverview();
+  const form = within(container.querySelector(".time-panel form") as HTMLElement);
+  expect(form.queryByRole("button", { name: "Use today" })).toBeNull();
+  const date = form.getByLabelText("Date") as HTMLInputElement;
+  const duration = form.getByRole("textbox", { name: "Duration" });
+  fireEvent.change(duration, { target: { value: "45m" } });
+  fireEvent.change(date, { target: { value: "2026-01-02" } });
+  fireEvent.click(form.getByRole("button", { name: "Use today" }));
+  expect(date.value).toBe(today());
+  expect((duration as HTMLInputElement).value).toBe("45m");
+  expect(form.queryByRole("button", { name: "Use today" })).toBeNull();
+  expect(form.queryByText(/local time/i)).toBeNull();
+  expect(JSON.parse(localStorage.getItem("worknotes.draft.v3:test-workspace")!).dateMode).toBe("today");
 });

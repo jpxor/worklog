@@ -281,6 +281,41 @@ fn walk(
     }
     Ok(())
 }
+fn is_note_root(path: &str) -> bool {
+    path.split('/').count() < if path.starts_with("global/") { 3 } else { 4 }
+}
+fn read_codes(path: &Path) -> Result<Vec<Value>> {
+    let codes = read_json(path)?
+        .as_array()
+        .ok_or("Invalid project code collection")?
+        .clone();
+    let mut ids = HashSet::new();
+    let mut labels = HashSet::new();
+    for code in &codes {
+        let id = field(code, "id")?;
+        let label = field(code, "label")?;
+        validate_name(label)?;
+        if id.is_empty()
+            || label != label.trim()
+            || !ids.insert(id)
+            || !labels.insert(label.to_lowercase())
+            || !code["archived"].is_boolean()
+        {
+            return Err("Invalid or duplicate project code".into());
+        }
+    }
+    Ok(codes)
+}
+fn require_code(codes: &[Value], id: &str, active: bool) -> Result<()> {
+    let code = codes
+        .iter()
+        .find(|c| c["id"] == id)
+        .ok_or("Unknown project code")?;
+    if active && code["archived"] == true {
+        return Err("Project code is archived. Choose another code or restore it.".into());
+    }
+    Ok(())
+}
 fn validate_ledger(records: &[Value], projects: &HashSet<String>) -> Result<()> {
     let mut ids = HashSet::new();
     let mut active = HashMap::new();
@@ -337,28 +372,7 @@ fn validate_entries(records: &[Value], projects: &HashSet<String>) -> Result<()>
     }
     validate_ledger(records, projects)
 }
-fn current_legacy_entries(records: &[Value]) -> Vec<Value> {
-    let mut active = HashSet::new();
-    for r in records {
-        if r["type"] == "entry" {
-            if let Some(id) = r["replaces"].as_str() {
-                active.remove(id);
-            }
-            active.insert(r["id"].as_str().unwrap().to_string());
-        } else {
-            active.remove(r["target"].as_str().unwrap());
-        }
-    }
-    records
-        .iter()
-        .filter(|r| r["type"] == "entry" && active.contains(r["id"].as_str().unwrap()))
-        .map(|r| {
-            let mut entry = r.clone();
-            entry.as_object_mut().unwrap().remove("replaces");
-            entry
-        })
-        .collect()
-}
+
 fn entries_bytes(entries: &[Value]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     for entry in entries {
@@ -386,6 +400,21 @@ fn copy_tree(source: &Path, dest: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn rename_directory(source: &Path, destination: &Path) -> std::io::Result<()> {
+    // Windows scanners can briefly hold a newly written directory without delete
+    // sharing. Retry that transient failure without changing the move semantics.
+    for _attempt in 0..10 {
+        match fs::rename(source, destination) {
+            #[cfg(windows)]
+            Err(error) if _attempt < 9 && matches!(error.raw_os_error(), Some(5 | 32 | 33)) => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            result => return result,
+        }
+    }
+    unreachable!()
 }
 
 impl Workspace {
@@ -435,22 +464,20 @@ impl Workspace {
     }
     fn note_path(&self, relative: &str) -> Result<PathBuf> {
         let parts: Vec<_> = relative.split('/').collect();
-        if parts.len() < 4
-            || parts[0] != "projects"
-            || parts[2] != "notes"
+        let global = parts.len() >= 3 && parts[0] == "global" && parts[1] == "notes";
+        let task = parts.len() >= 4 && parts[0] == "projects" && parts[2] == "notes";
+        if (!global && !task)
             || (!text_note(Path::new(relative)) && document_kind(Path::new(relative)).is_none())
         {
-            return Err("Choose a supported file inside a project's notes folder".into());
+            return Err("Choose a supported file inside Task notes or Global notes".into());
         }
         let path = self.safe(relative)?;
-        if !self
-            .root()?
-            .join("projects")
-            .join(parts[1])
-            .join("project.json")
-            .is_file()
+        if task
+            && !self
+                .safe(&format!("projects/{}/project.json", parts[1]))?
+                .is_file()
         {
-            return Err("Unknown project".into());
+            return Err("Unknown task".into());
         }
         Ok(path)
     }
@@ -503,9 +530,11 @@ impl Workspace {
             if fs::read_dir(&root).map_err(err)?.next().is_some() {
                 return Err("Folder is not empty and does not contain WorkLog data".into());
             }
-            atomic(&marker, b"{\"format\":\"worknotes\",\"version\":2}\n")?;
+            atomic(&marker, b"{\"format\":\"worknotes\",\"version\":3}\n")?;
             fs::create_dir(root.join("projects")).map_err(err)?;
             atomic(&root.join("projects/.gitkeep"), b"")?;
+            atomic(&root.join("project-codes.json"), b"[]\n")?;
+            atomic(&root.join("global/notes/.gitkeep"), b"")?;
             atomic(&root.join("time.jsonl"), b"")?;
             atomic(
                 &root.join(".gitignore"),
@@ -513,7 +542,7 @@ impl Workspace {
             )?;
         }
         let format = read_json(&marker)?;
-        if format["format"] != "worknotes" || (format["version"] != 1 && format["version"] != 2) {
+        if format["format"] != "worknotes" || format["version"] != 3 {
             return Err("Unsupported WorkLog data format".into());
         }
         let lock = OpenOptions::new()
@@ -530,10 +559,7 @@ impl Workspace {
         let old_lock = self.lock.take();
         self.config.root = root.to_string_lossy().into();
         self.lock = Some(lock);
-        if let Err(e) = self
-            .snapshot()
-            .and_then(|snapshot| self.migrate_time(&snapshot))
-        {
+        if let Err(e) = self.snapshot() {
             self.config = previous;
             self.lock = old_lock;
             return Err(e);
@@ -548,34 +574,10 @@ impl Workspace {
         self.commit();
         Ok(())
     }
-    fn migrate_time(&self, snapshot: &Value) -> Result<()> {
-        let root = self.root()?;
-        let mut marker = read_json(&root.join("worknotes.json"))?;
-        if marker["version"] != 1 {
-            return Ok(());
-        }
-        let records = snapshot["records"]
-            .as_array()
-            .ok_or("Invalid legacy time data")?;
-        let backup = self.safe(".migration/time-v1.jsonl")?;
-        if !backup.exists() {
-            atomic(&backup, &fs::read(root.join("time.jsonl")).map_err(err)?)?;
-        }
-        atomic(
-            &root.join("time.jsonl"),
-            &entries_bytes(&current_legacy_entries(records))?,
-        )?;
-        marker["version"] = json!(2);
-        atomic(
-            &root.join("worknotes.json"),
-            &serde_json::to_vec_pretty(&marker).map_err(err)?,
-        )?;
-        Ok(())
-    }
     fn snapshot(&self) -> Result<Value> {
         if self.config.root.is_empty() {
             return Ok(
-                json!({"root":"","projects":[],"notes":[],"folders":[],"records":[],"git":self.git_status,"remote":"","backupPath":self.config.backup_path,"lastBackup":self.config.last_backup,"backupTime":self.config.backup_time,"backupSlot":self.config.backup_slot,"backupError":self.config.backup_error}),
+                json!({"root":"","projects":[],"projectCodes":[],"notes":[],"folders":[],"records":[],"git":self.git_status,"remote":"","backupPath":self.config.backup_path,"lastBackup":self.config.last_backup,"backupTime":self.config.backup_time,"backupSlot":self.config.backup_slot,"backupError":self.config.backup_error}),
             );
         }
         let root = self.root()?;
@@ -614,7 +616,6 @@ impl Workspace {
             projects.push(p);
         }
         projects.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-        notes.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
         let text = fs::read_to_string(root.join("time.jsonl")).map_err(err)?;
         let mut records = Vec::new();
         if !text.is_empty() && !text.ends_with('\n') {
@@ -630,15 +631,25 @@ impl Workspace {
         if format["format"] != "worknotes" {
             return Err("Invalid WorkLog format".into());
         }
-        if format["version"] == 1 {
-            validate_ledger(&records, &ids)?;
-        } else if format["version"] == 2 {
-            validate_entries(&records, &ids)?;
-        } else {
+        if format["version"] != 3 {
             return Err("Unsupported WorkLog data format".into());
         }
+        validate_entries(&records, &ids)?;
+        let codes = read_codes(&self.safe("project-codes.json")?)?;
+        for project in &projects {
+            require_code(&codes, field(project, "defaultProjectCodeId")?, false)?;
+        }
+        for entry in &records {
+            require_code(&codes, field(entry, "projectCodeId")?, false)?;
+        }
+        walk(&root, &self.safe("global/notes")?, &mut notes, &mut folders)?;
+        notes.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+        for note in &mut notes {
+            let global = field(note, "path")?.starts_with("global/");
+            note["scope"] = json!(if global { "global" } else { "task" });
+        }
         Ok(
-            json!({"root":self.config.root,"projects":projects,"notes":notes,"folders":folders,"records":records,"git":self.git_status,"remote":self.remote(),"backupPath":self.config.backup_path,"lastBackup":self.config.last_backup,"backupTime":self.config.backup_time,"backupSlot":self.config.backup_slot,"backupError":self.config.backup_error}),
+            json!({"root":self.config.root,"projects":projects,"projectCodes":codes,"notes":notes,"folders":folders,"records":records,"git":self.git_status,"remote":self.remote(),"backupPath":self.config.backup_path,"lastBackup":self.config.last_backup,"backupTime":self.config.backup_time,"backupSlot":self.config.backup_slot,"backupError":self.config.backup_error}),
         )
     }
     pub fn read_document(&self, root: &str, relative: &str) -> Result<Vec<u8>> {
@@ -669,6 +680,36 @@ impl Workspace {
         match action {
             "load" => {}
             "open_workspace" => self.open(field(&p, "path")?)?,
+            "create_project_code" | "update_project_code" => {
+                let path = self.safe("project-codes.json")?;
+                let mut codes = read_codes(&path)?;
+                let label = field(&p, "label")?.trim();
+                validate_name(label)?;
+                let duplicate = codes.iter().position(|c| {
+                    c["label"].as_str().unwrap().to_lowercase() == label.to_lowercase()
+                });
+                if action == "create_project_code" {
+                    if let Some(index) = duplicate {
+                        if codes[index]["archived"] == true {
+                            return Err("This code is archived. Restore it to select it.".into());
+                        }
+                    } else {
+                        codes.push(json!({"id":uuid::Uuid::new_v4().to_string(),"label":label,"archived":false}));
+                    }
+                } else {
+                    let id = field(&p, "id")?;
+                    let index = codes
+                        .iter()
+                        .position(|c| c["id"] == id)
+                        .ok_or("Unknown project code")?;
+                    if duplicate.is_some_and(|other| other != index) {
+                        return Err("Project code label already exists".into());
+                    }
+                    codes[index] = json!({"id":id,"label":label,"archived":p["archived"].as_bool().ok_or("Missing archived status")?});
+                }
+                atomic(&path, &serde_json::to_vec_pretty(&codes).map_err(err)?)?;
+                self.commit();
+            }
             "create_project" => {
                 let name = field(&p, "name")?.trim();
                 validate_name(name)?;
@@ -682,14 +723,18 @@ impl Workspace {
                         "A project with that name already exists (check closed projects)".into(),
                     );
                 }
+                let code = field(&p, "defaultProjectCodeId")?;
+                require_code(snap["projectCodes"].as_array().unwrap(), code, true)?;
                 let id = uuid::Uuid::new_v4().to_string();
                 let root = self.root()?.join("projects").join(&id);
                 fs::create_dir_all(root.join("notes")).map_err(err)?;
                 atomic(&root.join("notes/.gitkeep"), b"")?;
                 atomic(
                     &root.join("project.json"),
-                    &serde_json::to_vec_pretty(&json!({"id":id,"name":name,"closed":false}))
-                        .map_err(err)?,
+                    &serde_json::to_vec_pretty(
+                        &json!({"id":id,"name":name,"closed":false,"defaultProjectCodeId":code}),
+                    )
+                    .map_err(err)?,
                 )?;
                 self.commit();
             }
@@ -700,6 +745,12 @@ impl Workspace {
                 let closed = p["closed"].as_bool().ok_or("Missing project status")?;
                 let snap = self.snapshot()?;
                 let projects = snap["projects"].as_array().unwrap();
+                let code = field(&p, "defaultProjectCodeId")?;
+                let changed = projects
+                    .iter()
+                    .find(|v| v["id"] == id)
+                    .is_none_or(|v| v["defaultProjectCodeId"] != code);
+                require_code(snap["projectCodes"].as_array().unwrap(), code, changed)?;
                 if !projects.iter().any(|v| v["id"] == id) {
                     return Err("Unknown project".into());
                 }
@@ -713,8 +764,10 @@ impl Workspace {
                 }
                 atomic(
                     &self.safe(&format!("projects/{id}/project.json"))?,
-                    &serde_json::to_vec_pretty(&json!({"id":id,"name":name,"closed":closed}))
-                        .map_err(err)?,
+                    &serde_json::to_vec_pretty(
+                        &json!({"id":id,"name":name,"closed":closed,"defaultProjectCodeId":code}),
+                    )
+                    .map_err(err)?,
                 )?;
                 self.commit();
             }
@@ -774,7 +827,7 @@ impl Workspace {
             "move_folder" => {
                 let source = field(&p, "path")?;
                 let destination = field(&p, "destination")?;
-                if source.split('/').count() < 4 || destination.split('/').count() < 4 {
+                if is_note_root(source) || is_note_root(destination) {
                     return Err("The project root cannot be moved".into());
                 }
                 self.note_path(&format!("{source}/probe.md"))?;
@@ -791,12 +844,12 @@ impl Workspace {
                     return Err("Destination already exists".into());
                 }
                 fs::create_dir_all(dest.parent().unwrap()).map_err(err)?;
-                fs::rename(old, dest).map_err(err)?;
+                rename_directory(&old, &dest).map_err(err)?;
                 self.commit();
             }
             "delete_folder" => {
                 let relative = field(&p, "path")?;
-                if relative.split('/').count() < 4 {
+                if is_note_root(relative) {
                     return Err("The project root cannot be deleted".into());
                 }
                 self.note_path(&format!("{relative}/probe.md"))?;
@@ -843,6 +896,14 @@ impl Workspace {
                 } else {
                     field(p.get("entry").ok_or("Missing time entry")?, "id")?
                 };
+                if action == "save_entry" {
+                    let code = field(&p["entry"], "projectCodeId")?;
+                    require_code(
+                        snap["projectCodes"].as_array().unwrap(),
+                        code,
+                        expected.is_none_or(|old| old["projectCodeId"] != code),
+                    )?;
+                }
                 let position = records.iter().position(|entry| entry["id"] == id);
                 match (position, expected) {
                     (Some(index), Some(expected)) => {
@@ -957,10 +1018,12 @@ impl Workspace {
                     }
                     atomic(
                         &folder.join("worknotes.json"),
-                        b"{\"format\":\"worknotes\",\"version\":2}\n",
+                        b"{\"format\":\"worknotes\",\"version\":3}\n",
                     )?;
                     fs::create_dir(folder.join("projects")).map_err(err)?;
                     atomic(&folder.join("projects/.gitkeep"), b"")?;
+                    atomic(&folder.join("project-codes.json"), b"[]\n")?;
+                    atomic(&folder.join("global/notes/.gitkeep"), b"")?;
                     atomic(&folder.join("time.jsonl"), b"")?;
                     atomic(&folder.join(".gitignore"), b".worknotes.lock\n")?;
                 }
@@ -1079,16 +1142,18 @@ impl Workspace {
         }
         let had = dest.exists();
         if had {
-            fs::rename(&dest, &old).map_err(err)?;
+            rename_directory(&dest, &old)
+                .map_err(|e| format!("Could not preserve the previous backup: {e}"))?;
         }
-        if let Err(e) = fs::rename(&next, &dest) {
+        if let Err(e) = rename_directory(&next, &dest) {
             if had {
-                let _ = fs::rename(&old, &dest);
+                let _ = rename_directory(&old, &dest);
             }
-            return Err(err(e));
+            return Err(format!("Could not install the new backup: {e}"));
         }
         if had {
-            fs::remove_dir_all(&old).map_err(err)?;
+            fs::remove_dir_all(&old)
+                .map_err(|e| format!("Backup saved; could not remove the previous backup: {e}"))?;
         }
         Ok(())
     }
@@ -1107,13 +1172,18 @@ mod tests {
             loaded: true,
         };
         w.open(d.path().join("data").to_str().unwrap()).unwrap();
+        atomic(
+            &w.root().unwrap().join("project-codes.json"),
+            br#"[{"id":"test","label":"TEST","archived":false}]"#,
+        )
+        .unwrap();
         (d, w)
     }
     #[test]
     fn correction_and_void_validation() {
         let ids = HashSet::from(["p".into()]);
-        let a = json!({"type":"entry","id":"a","projectId":"p","date":"2026-10-17","minutes":45,"note":""});
-        let b = json!({"type":"entry","id":"b","projectId":"p","date":"2026-10-17","minutes":60,"note":"","replaces":"a"});
+        let a = json!({"type":"entry","projectCodeId":"test","id":"a","projectId":"p","date":"2026-10-17","minutes":45,"note":""});
+        let b = json!({"type":"entry","projectCodeId":"test","id":"b","projectId":"p","date":"2026-10-17","minutes":60,"note":"","replaces":"a"});
         let v = json!({"type":"void","id":"v","target":"b"});
         assert!(validate_ledger(&[a.clone(), b.clone(), v.clone()], &ids).is_ok());
         assert!(validate_ledger(&[a.clone(), b, a.clone()], &ids).is_err());
@@ -1123,7 +1193,10 @@ mod tests {
     fn overview_reports_file_dates_and_preserves_plaintext_checkboxes() {
         let (_d, mut w) = setup();
         let snapshot = w
-            .dispatch("create_project", json!({"name":"Overview"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Overview"}),
+            )
             .unwrap();
         let id = snapshot["projects"][0]["id"].as_str().unwrap();
         let path = format!("projects/{id}/notes/log.md");
@@ -1162,14 +1235,17 @@ mod tests {
         );
         assert_eq!(
             read_json(&w.root().unwrap().join("worknotes.json")).unwrap()["version"],
-            2
+            3
         );
     }
     #[test]
     fn note_conflict_and_traversal() {
         let (_d, mut w) = setup();
         let s = w
-            .dispatch("create_project", json!({"name":"Test"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Test"}),
+            )
             .unwrap();
         let id = s["projects"][0]["id"].as_str().unwrap();
         let path = format!("projects/{id}/notes/test.md");
@@ -1191,7 +1267,10 @@ mod tests {
     fn note_moves_preserve_content_and_reject_collisions() {
         let (_d, mut w) = setup();
         let s = w
-            .dispatch("create_project", json!({"name":"Test"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Test"}),
+            )
             .unwrap();
         let id = s["projects"][0]["id"].as_str().unwrap();
         let root = format!("projects/{id}/notes");
@@ -1244,8 +1323,11 @@ mod tests {
     #[test]
     fn daily_backups_skip_unchanged_data_and_persist_schedule() {
         let (d, mut w) = setup();
-        w.dispatch("create_project", json!({"name":"Daily"}))
-            .unwrap();
+        w.dispatch(
+            "create_project",
+            json!({"defaultProjectCodeId":"test","name":"Daily"}),
+        )
+        .unwrap();
         let parent = d.path().join("daily-backup");
         fs::create_dir(&parent).unwrap();
         w.config.backup_path = parent.to_string_lossy().into();
@@ -1266,8 +1348,11 @@ mod tests {
             serde_json::from_value(read_json(&w.config_dir.join("settings.json")).unwrap())
                 .unwrap();
         assert_eq!(persisted.backup_slot, "2026-10-18T17:00");
-        w.dispatch("create_project", json!({"name":"Changed"}))
-            .unwrap();
+        w.dispatch(
+            "create_project",
+            json!({"defaultProjectCodeId":"test","name":"Changed"}),
+        )
+        .unwrap();
         w.dispatch("scheduled_backup", json!({"slot":"2026-10-18T17:00"}))
             .unwrap();
         assert!(!parent.join("WorkNotes-backup").exists());
@@ -1275,8 +1360,11 @@ mod tests {
             .unwrap();
         assert!(parent.join("WorkNotes-backup").exists());
         let previous_fingerprint = w.config.backup_fingerprint.clone();
-        w.dispatch("create_project", json!({"name":"Changed again"}))
-            .unwrap();
+        w.dispatch(
+            "create_project",
+            json!({"defaultProjectCodeId":"test","name":"Changed again"}),
+        )
+        .unwrap();
         w.dispatch("scheduled_backup", json!({"slot":"2026-10-19T17:00"}))
             .unwrap();
         assert_ne!(w.config.backup_fingerprint, previous_fingerprint);
@@ -1284,8 +1372,11 @@ mod tests {
     #[test]
     fn failed_backups_remain_due_and_retry_successfully() {
         let (d, mut w) = setup();
-        w.dispatch("create_project", json!({"name":"Retry"}))
-            .unwrap();
+        w.dispatch(
+            "create_project",
+            json!({"defaultProjectCodeId":"test","name":"Retry"}),
+        )
+        .unwrap();
         let parent = d.path().join("unavailable");
         w.config.backup_path = parent.to_string_lossy().into();
         assert!(w
@@ -1323,7 +1414,12 @@ mod tests {
     #[test]
     fn text_files_folder_moves_and_empty_folder_deletion() {
         let (_d, mut w) = setup();
-        let initial = w.dispatch("create_project", json!({"name":"One"})).unwrap();
+        let initial = w
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"One"}),
+            )
+            .unwrap();
         let first = initial["projects"][0]["id"].as_str().unwrap();
         let root = format!("projects/{first}/notes");
         let path = format!("{root}/docs/sub/plain.txt");
@@ -1356,7 +1452,12 @@ mod tests {
             format!("{destination}/sub/plain.txt")
         );
         assert!(!w.safe(&folder).unwrap().exists());
-        let snapshot = w.dispatch("create_project", json!({"name":"Two"})).unwrap();
+        let snapshot = w
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Two"}),
+            )
+            .unwrap();
         let second = snapshot["projects"]
             .as_array()
             .unwrap()
@@ -1401,7 +1502,10 @@ mod tests {
     fn binary_documents_are_discovered_read_only_and_workspace_scoped() {
         let (_d, mut w) = setup();
         let snapshot = w
-            .dispatch("create_project", json!({"name":"Documents"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Documents"}),
+            )
             .unwrap();
         let id = snapshot["projects"][0]["id"].as_str().unwrap();
         let path = format!("projects/{id}/notes/reference.PDF");
@@ -1460,7 +1564,10 @@ mod tests {
     fn windows_recycle_roundtrip() {
         let (_d, mut w) = setup();
         let snapshot = w
-            .dispatch("create_project", json!({"name":"Recycle test"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Recycle test"}),
+            )
             .unwrap();
         let id = snapshot["projects"][0]["id"].as_str().unwrap();
         let root = format!("projects/{id}/notes");
@@ -1504,8 +1611,11 @@ mod tests {
     #[test]
     fn backup_roundtrip() {
         let (d, mut w) = setup();
-        w.dispatch("create_project", json!({"name":"Keep me"}))
-            .unwrap();
+        w.dispatch(
+            "create_project",
+            json!({"defaultProjectCodeId":"test","name":"Keep me"}),
+        )
+        .unwrap();
         let backup = d.path().join("backups");
         fs::create_dir(&backup).unwrap();
         w.config.backup_path = backup.to_string_lossy().into();
@@ -1556,7 +1666,10 @@ mod tests {
         .unwrap();
         assert_eq!(w.snapshot().unwrap()["projects"], json!([]));
         let s = w
-            .dispatch("create_project", json!({"name":"Restored workspace"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Restored workspace"}),
+            )
             .unwrap();
         let id = s["projects"][0]["id"].as_str().unwrap();
         let path = format!("projects/{id}/notes/meeting.md");
@@ -1566,7 +1679,7 @@ mod tests {
             json!({"path":path,"expected":"","content":"# Keep this note"}),
         )
         .unwrap();
-        w.dispatch("save_entry", json!({"entry":{"type":"entry","id":"e1","projectId":id,"date":"2026-10-17","minutes":90,"note":""}})).unwrap();
+        w.dispatch("save_entry", json!({"entry":{"type":"entry","projectCodeId":"test","id":"e1","projectId":id,"date":"2026-10-17","minutes":90,"note":""}})).unwrap();
         let remote_before = git(&remote, &["rev-parse", "HEAD"]).unwrap();
         w.dispatch("commit", json!({})).unwrap();
         assert_eq!(git(&remote, &["rev-parse", "HEAD"]).unwrap(), remote_before);
@@ -1589,14 +1702,17 @@ mod tests {
     fn entries_can_be_edited_and_removed_with_stale_edit_protection() {
         let (_d, mut w) = setup();
         let snapshot = w
-            .dispatch("create_project", json!({"name":"Editable"}))
+            .dispatch(
+                "create_project",
+                json!({"defaultProjectCodeId":"test","name":"Editable"}),
+            )
             .unwrap();
         let project = snapshot["projects"][0]["id"].as_str().unwrap();
-        let original = json!({"type":"entry","id":"one","projectId":project,"date":"2026-10-17","minutes":45,"note":"Before"});
-        let other = json!({"type":"entry","id":"two","projectId":project,"date":"2026-10-16","minutes":30,"note":"Keep"});
+        let original = json!({"type":"entry","projectCodeId":"test","id":"one","projectId":project,"date":"2026-10-17","minutes":45,"note":"Before"});
+        let other = json!({"type":"entry","projectCodeId":"test","id":"two","projectId":project,"date":"2026-10-16","minutes":30,"note":"Keep"});
         w.dispatch("save_entry", json!({"entry":original})).unwrap();
         w.dispatch("save_entry", json!({"entry":other})).unwrap();
-        let updated = json!({"type":"entry","id":"one","projectId":project,"date":"2026-10-18","minutes":90,"note":"After"});
+        let updated = json!({"type":"entry","projectCodeId":"test","id":"one","projectId":project,"date":"2026-10-18","minutes":90,"note":"After"});
         let snapshot = w
             .dispatch("save_entry", json!({"entry":updated,"expected":original}))
             .unwrap();
@@ -1619,58 +1735,32 @@ mod tests {
     }
 
     #[test]
-    fn legacy_ledger_migration_preserves_current_entries_and_original_plaintext() {
-        let (d, mut w) = setup();
-        let snapshot = w
-            .dispatch("create_project", json!({"name":"Legacy"}))
-            .unwrap();
-        let project = snapshot["projects"][0]["id"].as_str().unwrap();
-        let a = json!({"type":"entry","id":"a","projectId":project,"date":"2026-10-17","minutes":45,"note":"Original"});
-        let b = json!({"type":"entry","id":"b","projectId":project,"date":"2026-10-17","minutes":90,"note":"Updated","replaces":"a"});
-        let c = json!({"type":"entry","id":"c","projectId":project,"date":"2026-10-17","minutes":20,"note":"Removed"});
-        let v = json!({"type":"void","id":"v","target":"c"});
-        let bytes = entries_bytes(&[a, b.clone(), c, v]).unwrap();
+    fn unsupported_formats_are_rejected_without_changing_workspace_data() {
+        let (d, w) = setup();
         let root = w.root().unwrap();
-        atomic(&root.join("time.jsonl"), &bytes).unwrap();
-        atomic(
-            &root.join("worknotes.json"),
-            b"{\"format\":\"worknotes\",\"version\":1}",
-        )
-        .unwrap();
+        let codes = fs::read(root.join("project-codes.json")).unwrap();
+        let time = fs::read(root.join("time.jsonl")).unwrap();
         drop(w);
-        let mut restored = Workspace {
-            config_dir: d.path().join("migrated-config"),
-            config: Config::default(),
-            lock: None,
-            git_status: String::new(),
-            loaded: true,
-        };
-        restored.open(root.to_str().unwrap()).unwrap();
-        let snapshot = restored.snapshot().unwrap();
-        let mut expected = b;
-        expected.as_object_mut().unwrap().remove("replaces");
-        assert_eq!(snapshot["records"], json!([expected]));
-        assert_eq!(
-            read_json(&root.join("worknotes.json")).unwrap()["version"],
-            2
-        );
-        assert_eq!(
-            fs::read(root.join(".migration/time-v1.jsonl")).unwrap(),
-            bytes
-        );
-        restored
-            .dispatch("delete_entry", json!({"id":"b","expected":expected}))
-            .unwrap();
-        drop(restored);
         let mut reopened = Workspace {
-            config_dir: d.path().join("reopened-config"),
+            config_dir: d.path().join("reopened"),
             config: Config::default(),
             lock: None,
             git_status: String::new(),
             loaded: true,
         };
-        reopened.open(root.to_str().unwrap()).unwrap();
-        assert_eq!(reopened.snapshot().unwrap()["records"], json!([]));
+        for version in [1, 2, 4] {
+            let marker =
+                serde_json::to_vec(&json!({"format":"worknotes","version":version})).unwrap();
+            atomic(&root.join("worknotes.json"), &marker).unwrap();
+            assert_eq!(
+                reopened.open(root.to_str().unwrap()).unwrap_err(),
+                "Unsupported WorkLog data format"
+            );
+            assert_eq!(fs::read(root.join("worknotes.json")).unwrap(), marker);
+            assert_eq!(fs::read(root.join("project-codes.json")).unwrap(), codes);
+            assert_eq!(fs::read(root.join("time.jsonl")).unwrap(), time);
+            assert!(root.join("global/notes/.gitkeep").is_file());
+        }
     }
 
     #[test]
@@ -1687,5 +1777,113 @@ mod tests {
         fs::write(w.root().unwrap().join("time.jsonl"), "{\"partial\":").unwrap();
         assert!(w.snapshot().unwrap_err().contains("incomplete final line"));
         assert!(w.check_backup(&w.config.root).is_err());
+    }
+
+    #[test]
+    fn code_archiving_preserves_history_and_rejects_new_time() {
+        let (_d, mut w) = setup();
+        let snap = w
+            .dispatch(
+                "create_project",
+                json!({"name":"Task","defaultProjectCodeId":"test"}),
+            )
+            .unwrap();
+        let task = snap["projects"][0]["id"].clone();
+        let entry = json!({"type":"entry","id":"one","projectId":task,"projectCodeId":"test","date":"2026-10-18","minutes":45,"note":"original"});
+        w.dispatch("save_entry", json!({"entry":entry})).unwrap();
+        w.dispatch(
+            "update_project_code",
+            json!({"id":"test","label":"Renamed","archived":true}),
+        )
+        .unwrap();
+        let mut edited = entry.clone();
+        edited["note"] = json!("edited");
+        let snap = w
+            .dispatch("save_entry", json!({"entry":edited,"expected":entry}))
+            .unwrap();
+        assert_eq!(snap["records"][0]["projectCodeId"], "test");
+        assert_eq!(snap["projects"][0]["defaultProjectCodeId"], "test");
+        let mut fresh = edited.clone();
+        fresh["id"] = json!("two");
+        assert!(w.dispatch("save_entry", json!({"entry":fresh})).is_err());
+        assert!(w
+            .dispatch("create_project_code", json!({"label":" renamed "}))
+            .is_err());
+        w.dispatch(
+            "update_project_code",
+            json!({"id":"test","label":"Renamed","archived":false}),
+        )
+        .unwrap();
+        w.dispatch("save_entry", json!({"entry":fresh})).unwrap();
+        let snap = w
+            .dispatch("create_project_code", json!({"label":" renamed "}))
+            .unwrap();
+        assert_eq!(snap["projectCodes"].as_array().unwrap().len(), 1);
+        let mut invalid = edited;
+        invalid["id"] = json!("bad");
+        invalid["projectCodeId"] = json!("missing");
+        assert!(w.dispatch("save_entry", json!({"entry":invalid})).is_err());
+        assert!(w
+            .dispatch("create_project_code", json!({"label":"bad\nlabel"}))
+            .is_err());
+    }
+
+    #[test]
+    fn global_folder_moves_preserve_documents_and_validate_destinations() {
+        let (_d, mut w) = setup();
+        let snapshot = w
+            .dispatch(
+                "create_project",
+                json!({"name":"Task","defaultProjectCodeId":"test"}),
+            )
+            .unwrap();
+        let task = snapshot["projects"][0]["id"].as_str().unwrap();
+        let original = format!("projects/{task}/notes/nested");
+        let root = w.root().unwrap();
+        atomic(
+            &root.join(format!("{original}/note.md")),
+            b"- [ ] shared item",
+        )
+        .unwrap();
+        atomic(&root.join(format!("{original}/image.png")), b"image bytes").unwrap();
+        let snapshot = w
+            .dispatch(
+                "move_folder",
+                json!({"path":original,"destination":"global/notes/nested"}),
+            )
+            .unwrap();
+        assert!(snapshot["notes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|note| note["scope"] == "global"));
+        assert_eq!(
+            fs::read(root.join("global/notes/nested/image.png")).unwrap(),
+            b"image bytes"
+        );
+        assert!(!root.join(&original).exists());
+        assert!(w
+            .dispatch(
+                "move_folder",
+                json!({"path":"global/notes","destination":original})
+            )
+            .is_err());
+        assert!(w.dispatch("rename_note",json!({"path":"global/notes/nested/note.md","destination":"global/notes/../../escape.md"})).is_err());
+        w.dispatch(
+            "move_folder",
+            json!({"path":"global/notes/nested","destination":original}),
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read(root.join(format!("{original}/note.md"))).unwrap(),
+            b"- [ ] shared item"
+        );
+        assert!(!root.join("global/notes/nested").exists());
+        let snapshot = w.snapshot().unwrap();
+        assert!(snapshot["notes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|note| note["scope"] == "task"));
     }
 }

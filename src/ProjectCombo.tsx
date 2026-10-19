@@ -7,7 +7,11 @@ export default function ProjectCombo({
   value,
   onPick,
   onCreate,
+  label = "Task",
+  includeClosed = false,
 }: {
+  label?: string;
+  includeClosed?: boolean;
   projects: Project[];
   value: string;
   onPick: (project: Project) => void;
@@ -22,7 +26,9 @@ export default function ProjectCombo({
   const current = projects.find((project) => project.id === value);
   const query = text.trim().toLowerCase();
   const matches = projects.filter(
-    (project) => !project.closed && project.name.toLowerCase().includes(query),
+    (project) =>
+      (includeClosed || !project.closed) &&
+      project.name.toLowerCase().includes(query),
   );
   const canCreate =
     !!query &&
@@ -55,7 +61,7 @@ export default function ProjectCombo({
       <input
         ref={input}
         role="combobox"
-        aria-label="Project"
+        aria-label={label}
         aria-expanded={open}
         aria-controls={id}
         aria-autocomplete="list"
@@ -63,7 +69,7 @@ export default function ProjectCombo({
           open && index >= 0 ? `${id}-${index}` : undefined
         }
         value={open ? text : current?.name || ""}
-        placeholder="Choose or create project…"
+        placeholder={"Choose or create " + label.toLowerCase() + "…"}
         onFocus={show}
         onClick={() => {
           if (!open) show();
@@ -76,6 +82,7 @@ export default function ProjectCombo({
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
+            event.stopPropagation();
             setOpen(false);
             setIndex(-1);
           } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -118,7 +125,7 @@ export default function ProjectCombo({
       <button
         type="button"
         className="combo-toggle"
-        aria-label="Toggle project list"
+        aria-label={"Toggle " + label.toLowerCase() + " list"}
         aria-expanded={open}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => {
@@ -136,7 +143,7 @@ export default function ProjectCombo({
           ref={menu}
           id={id}
           role="listbox"
-          aria-label="Projects"
+          aria-label={label + "s"}
           className="combo-menu"
         >
           {matches.map((project, choice) => (
@@ -168,10 +175,10 @@ export default function ProjectCombo({
               onClick={() => choose(matches.length)}
             >
               <Plus size={14} />
-              Create “{text.trim()}”
+              Create {label.toLowerCase()} “{text.trim()}”
             </button>
           )}
-          {!count && <span>No open projects</span>}
+          {!count && <span>No available options</span>}
         </div>
       )}
     </div>

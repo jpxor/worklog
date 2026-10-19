@@ -103,8 +103,9 @@ export default function McpSettings() {
             <p className="muted small">
               Use 127.0.0.1 for this computer, or your specific
               corporate-network interface IP for remote access. Network access
-              requires TLS; your LLM server must be able to reach this computer
-              and trust the certificate.
+              uses TLS unless you allow HTTP on a private network below. Your
+              LLM server must be able to reach this computer and, for TLS, trust
+              the certificate.
             </p>
             <label>
               TLS certificate file (PEM)
@@ -126,6 +127,27 @@ export default function McpSettings() {
                 placeholder="Full path to private key"
               />
             </label>
+            <label className="mcp-http-option">
+              <input
+                type="checkbox"
+                checked={config.allowPrivateNetworkHttp}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    allowPrivateNetworkHttp: e.target.checked,
+                  })
+                }
+                aria-describedby="private-network-http-help"
+              />
+              Allow HTTP on a private network
+            </label>
+            <p id="private-network-http-help" className="muted small">
+              Only enable this on a trusted private network or encrypted VPN.
+              HTTP sends your token and workspace data without encryption. Leave
+              both TLS files blank to use HTTP; supplying both files uses HTTPS
+              even when this option is enabled. Public IP addresses still
+              require TLS.
+            </p>
             <label>
               Additional endpoint hostnames (one per line)
               <textarea

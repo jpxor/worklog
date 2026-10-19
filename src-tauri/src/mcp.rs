@@ -37,6 +37,7 @@ pub struct Config {
     pub port: u16,
     pub certificate_path: String,
     pub private_key_path: String,
+    pub allow_private_network_http: bool,
     pub allowed_hosts: Vec<String>,
     pub allowed_origins: Vec<String>,
 }
@@ -47,6 +48,7 @@ impl Default for Config {
             port: 43127,
             certificate_path: String::new(),
             private_key_path: String::new(),
+            allow_private_network_http: false,
             allowed_hosts: Vec::new(),
             allowed_origins: Vec::new(),
         }
@@ -314,9 +316,16 @@ fn validate(config: &Config) -> Result<(), String> {
     if config.certificate_path.is_empty() != config.private_key_path.is_empty() {
         return Err("Supply both the certificate and private key paths".into());
     }
-    if !host.is_loopback() && config.certificate_path.is_empty() {
+    let private_network = match host {
+        IpAddr::V4(ip) => ip.is_private(),
+        IpAddr::V6(ip) => ip.is_unique_local(),
+    };
+    if !host.is_loopback()
+        && config.certificate_path.is_empty()
+        && !(config.allow_private_network_http && private_network)
+    {
         return Err(
-            "Network sharing requires a TLS certificate and private key; localhost can use HTTP"
+            "Supply a TLS certificate and private key, or allow HTTP on a private network with a private interface IP; public IP addresses require TLS"
                 .into(),
         );
     }
@@ -463,6 +472,7 @@ mod tests {
     };
     use std::time::Duration;
     fn workspace(root: &std::path::Path) -> Arc<Mutex<Workspace>> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let store = Store::new(root.join("settings"));
         let shared = store.shared();
         {
@@ -472,8 +482,15 @@ mod tests {
                 json!({"path":root.join("data").to_string_lossy()}),
             )
             .unwrap();
+            let codes = w
+                .dispatch("create_project_code", json!({"label":"TEST"}))
+                .unwrap();
+            let code = codes["projectCodes"][0]["id"].as_str().unwrap();
             let snapshot = w
-                .dispatch("create_project", json!({"name":"Evidence"}))
+                .dispatch(
+                    "create_project",
+                    json!({"name":"Evidence","defaultProjectCodeId":code}),
+                )
                 .unwrap();
             let id = snapshot["projects"][0]["id"].as_str().unwrap();
             let path = format!("projects/{id}/notes/log.md");
@@ -501,6 +518,62 @@ mod tests {
         })
         .await
         .unwrap()
+    }
+    #[test]
+    fn private_network_http_is_opt_in_and_persists() {
+        let old: Config = serde_json::from_value(json!({"bindHost":"192.168.1.20"})).unwrap();
+        assert!(!old.allow_private_network_http);
+        assert!(validate(&old).is_err());
+        for address in ["10.0.0.2", "172.16.0.2", "192.168.1.20", "fd12::1"] {
+            let config = Config {
+                bind_host: address.into(),
+                allow_private_network_http: true,
+                ..Default::default()
+            };
+            assert!(validate(&config).is_ok(), "{address}");
+        }
+        for address in [
+            "8.8.8.8",
+            "172.32.0.1",
+            "2001:4860:4860::8888",
+            "0.0.0.0",
+            "::",
+        ] {
+            assert!(
+                validate(&Config {
+                    bind_host: address.into(),
+                    allow_private_network_http: true,
+                    ..Default::default()
+                })
+                .is_err(),
+                "{address}"
+            );
+        }
+        assert!(validate(&Config {
+            bind_host: "192.168.1.20".into(),
+            allow_private_network_http: true,
+            certificate_path: "cert.pem".into(),
+            ..Default::default()
+        })
+        .is_err());
+        let root = tempfile::tempdir().unwrap();
+        let mut controller = Controller::new(root.path().into());
+        controller.config.bind_host = "192.168.1.20".into();
+        controller.config.allow_private_network_http = true;
+        controller.persist().unwrap();
+        let restored = Controller::new(root.path().into());
+        assert!(restored.config.allow_private_network_http);
+        assert_eq!(
+            restored.status()["endpoint"],
+            "http://192.168.1.20:43127/mcp"
+        );
+        controller.config.certificate_path = "cert.pem".into();
+        controller.config.private_key_path = "key.pem".into();
+        assert!(validate(&controller.config).is_ok());
+        assert_eq!(
+            controller.status()["endpoint"],
+            "https://192.168.1.20:43127/mcp"
+        );
     }
     #[test]
     fn validates_network_exposure_and_starts_disabled() {
@@ -596,7 +669,7 @@ mod tests {
             .json()
             .await
             .unwrap();
-        assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 6);
+        assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 7);
         assert!(response["result"]["tools"]
             .as_array()
             .unwrap()
@@ -622,9 +695,9 @@ mod tests {
             StreamableHttpClientTransportConfig::with_uri(url.to_string()).auth_header(token),
         );
         let peer = ().serve(transport).await.unwrap();
-        assert_eq!(peer.list_all_tools().await.unwrap().len(), 6);
+        assert_eq!(peer.list_all_tools().await.unwrap().len(), 7);
         let response = peer
-            .call_tool(CallToolRequestParams::new("list_projects"))
+            .call_tool(CallToolRequestParams::new("list_tasks"))
             .await
             .unwrap();
         let result = response.structured_content.unwrap();
@@ -649,7 +722,7 @@ mod tests {
         let history = peer
             .call_tool(
                 CallToolRequestParams::new("list_history")
-                    .with_arguments(json!({"projectId":id}).as_object().unwrap().clone()),
+                    .with_arguments(json!({"taskId":id}).as_object().unwrap().clone()),
             )
             .await
             .unwrap();
@@ -663,7 +736,7 @@ mod tests {
             )
             .unwrap();
         let response = peer
-            .call_tool(CallToolRequestParams::new("list_projects"))
+            .call_tool(CallToolRequestParams::new("list_tasks"))
             .await
             .unwrap();
         let result = response;
@@ -715,7 +788,7 @@ mod tests {
             .auth_header(status["token"].as_str().unwrap()),
         );
         let peer = ().serve(transport).await.unwrap();
-        assert_eq!(peer.list_all_tools().await.unwrap().len(), 6);
+        assert_eq!(peer.list_all_tools().await.unwrap().len(), 7);
         peer.cancel().await.unwrap();
         controller.stop();
     }
