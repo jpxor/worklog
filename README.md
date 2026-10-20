@@ -60,6 +60,8 @@ Task notes and time records use **plain-text storage** in a local folder you cho
 
 WorkLog supports local Git history, scheduled backups to a Git remote or folder, and manual backups. Git history requires Git on your PATH. Scheduled backups run while the app is open, and remote backups use your existing SSH keys or Git credential helper.
 
+Settings → Timesheet reminders lets you enable native OS notifications at a local time on selected weekdays. Reminders are off by default and require notification permission. Use Test notification to check delivery. Keep WorkLog open (minimized is fine); reminders do not run after quitting. A missed reminder is delivered when the app next runs on that selected day, with at most one scheduled notification per day across restarts. On Windows, test notifications from an installed build; system notification settings and Do Not Disturb can suppress banners.
+
 See [history and backups](docs/user-guide.md#history-and-backups) for scheduling, restore steps, and what backups include.
 
 ## Development

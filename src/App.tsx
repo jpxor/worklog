@@ -42,6 +42,7 @@ import ProjectInput from "./ProjectCombo";
 import NoteTabs from "./NoteTabs";
 import ProjectOverview from "./ProjectOverview";
 import McpSettings from "./McpSettings";
+import ReminderSettings from "./ReminderSettings";
 import { searchNotes } from "./noteSearch";
 import {
   overviewTab,
@@ -2492,6 +2493,8 @@ export default function App() {
                 )}
                 <hr />
                 <McpSettings />
+                <hr />
+                <ReminderSettings />
                 <hr />
                 <h3>Git repository Backup</h3>
                 <p className="muted small">

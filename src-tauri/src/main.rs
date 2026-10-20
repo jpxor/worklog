@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod evidence;
 mod mcp;
+mod reminders;
 mod storage;
 mod system_trash;
 use std::sync::Mutex;
@@ -87,8 +88,10 @@ fn main() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let path = app.path().app_data_dir()?;
+            reminders::start(app.handle(), &path)?;
             app.manage(std::sync::Arc::new(Mutex::new(mcp::Controller::new(
                 path.clone(),
             ))));
@@ -99,7 +102,8 @@ fn main() {
             dispatch,
             export_report,
             read_document,
-            mcp_control
+            mcp_control,
+            reminders::reminder_settings
         ])
         .run(tauri::generate_context!())
         .expect("Failed to start WorkLog");
