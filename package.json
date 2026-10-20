@@ -2,6 +2,7 @@
   "name": "worknotes",
   "version": "0.1.26",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
@@ -12,6 +13,8 @@
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "test:release": "node --test scripts/release-tests.mjs",
+    "release:check": "node scripts/release.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -42,6 +45,6 @@
     "prettier": "^3.9.10",
     "typescript": "~5.7.3",
     "vite": "^6.1.0",
-    "vitest": "^3.0.0"
+    "vitest": "^4.1.12"
   }
 }

@@ -27,6 +27,9 @@
   },
   "bundle": {
     "active": true,
+    "resources": {
+      "../LICENSE": "licenses/WorkLog-LICENSE.txt"
+    },
     "targets": "all",
     "shortDescription": "Project notes and time, kept local",
     "category": "Productivity",

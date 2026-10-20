@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   desktop:
     strategy:
@@ -15,29 +18,49 @@ jobs:
         os: [windows-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require release commit on main
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           workspaces: src-tauri
       - name: Linux dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm ci
+      - run: npm run test:release
+      - name: Verify release metadata and notes
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+        shell: bash
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then
+            npm run release:check -- --tag "$RELEASE_TAG"
+          else
+            npm run release:check
+          fi
       - run: npm test
       - run: npm run build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       - name: Build Windows installer
         if: runner.os == 'Windows'
         run: npm run tauri build -- --bundles nsis
       - name: Build Linux packages
         if: runner.os == 'Linux'
         run: npm run tauri build -- --bundles deb,appimage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: WorkLog-${{ runner.os }}
           path: |
@@ -47,31 +70,40 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: desktop
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Verify release version
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require release commit on main
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Prepare release notes and verify version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          node --input-type=module -e 'import fs from "node:fs"; const version = JSON.parse(fs.readFileSync("package.json")).version; const tauri = JSON.parse(fs.readFileSync("src-tauri/tauri.conf.json")).version; if (process.env.RELEASE_TAG !== `v${version}` || version !== tauri) throw new Error("Release tag and app versions must match");'
-      - uses: actions/download-artifact@v4
+          node scripts/release.mjs --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/worklog-release-notes.md"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: WorkLog-*
           path: artifacts
       - name: Prepare release files
         run: |
           mkdir release
+          cp LICENSE release/LICENSE.txt
           cp artifacts/WorkLog-Windows/worknotes.exe release/WorkLog-windows-x64.exe
           cp artifacts/WorkLog-Windows/bundle/nsis/*.exe release/
           cp artifacts/WorkLog-Linux/bundle/deb/*.deb release/
           cp artifacts/WorkLog-Linux/bundle/appimage/*.AppImage release/
           chmod +x artifacts/WorkLog-Linux/worknotes
-          tar -czf release/WorkLog-linux-x64.tar.gz -C artifacts/WorkLog-Linux worknotes
+          tar -czf release/WorkLog-linux-x64.tar.gz LICENSE -C artifacts/WorkLog-Linux worknotes
           cd release
           sha256sum * > SHA256SUMS.txt
       - name: Publish release
@@ -79,4 +111,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" release/* --verify-tag --title "WorkLog $RELEASE_TAG" --notes-file docs/release-notes.md
+          gh release create "$RELEASE_TAG" release/* --draft --verify-tag --title "WorkLog $RELEASE_TAG" --notes-file "$RUNNER_TEMP/worklog-release-notes.md"
+          gh release edit "$RELEASE_TAG" --draft=false --latest

@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible WorkLog defect using sanitized data.
+body:
+  - type: markdown
+    attributes:
+      value: "For suspected vulnerabilities, follow [SECURITY.md](https://github.com/jpxor/worklog/blob/main/SECURITY.md). Do not include private notes, credentials, tokens, or internal URLs."
+  - type: input
+    id: environment
+    attributes:
+      label: Version, OS, and package
+      description: Include WorkLog version, OS version/architecture, and installer, standalone, or source build.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use a disposable workspace and synthetic examples. Mention the workspace format if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Review all attachments for private information before submitting.
