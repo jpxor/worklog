@@ -20,8 +20,9 @@ from its official checksum-verified release (or `cargo install cargo-about --ver
 0.9.2 --locked`), and run:
 
 ```sh
-cargo about generate --manifest-path src-tauri/Cargo.toml --locked --format json --fail -o rust-licenses.json
-node scripts/third-party.mjs --rust-json rust-licenses.json
+mkdir -p .tools
+cargo about generate --manifest-path src-tauri/Cargo.toml --locked --format json --fail -o .tools/rust-licenses.json
+node scripts/third-party.mjs --rust-json .tools/rust-licenses.json
 npm run notices:check
 ```
 

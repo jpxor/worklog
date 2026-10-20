@@ -83,7 +83,12 @@ for (const [path,p] of Object.entries(lock.packages).sort(([a],[b]) => a.localeC
 for (const dir of ['cmaps','standard_fonts','wasm','iccs']) collect(join(root,'node_modules/pdfjs-dist',dir), `pdfjs-dist/${dir}`, true);
 const sources = json('third-party/sources.json');
 for (const s of sources) if (hash(read(`third-party/sources/${s.file}`)) !== s.sha256) throw new Error(`Missing or altered corresponding source: ${s.file}`);
-for (const p of rust.packages.filter(p => p.license.includes('MPL-2.0'))) if (!sources.some(s => s.file === `${p.name}-${p.version}.crate`)) throw new Error(`Missing MPL source: ${p.name}@${p.version}`);
+for (const p of rust.packages.filter(p => p.license.includes('MPL-2.0'))) {
+  const source = sources.find(s => s.file === `${p.name}-${p.version}.crate`);
+  if (!source) throw new Error(`Missing MPL source: ${p.name}@${p.version}`);
+  const block = text('src-tauri/Cargo.lock').split('[[package]]').find(b => b.includes(`name = "${p.name}"`) && b.includes(`version = "${p.version}"`));
+  if (block?.match(/checksum = "([a-f0-9]+)"/)?.[1] !== source.sha256) throw new Error(`MPL source does not match Cargo.lock: ${source.file}`);
+}
 output('third-party/inventory.json', render({ lockHashes, npmScope: 'Locked non-dev, non-optional npm dependency superset. Some packages are tree-shaken. Optional Node canvas/native dependencies are not used by the browser application.', npm: packages, rustScope: rust.generator, rust: rust.packages, sources }));
 const sections = [
   'WorkLog third-party notices',
@@ -94,5 +99,7 @@ const sections = [
   ...texts.map(t => `${t.name}\n${'='.repeat(72)}\n${t.text}`),
   ...rust.licenses.map(l => `${l.license}: ${l.packages.join(', ')}\n${'='.repeat(72)}\n${text(`third-party/${l.file}`)}`),
 ];
-output('THIRD-PARTY-NOTICES.txt', `${sections.join('\n\n')}\n`);
+const notices = `${sections.join('\n\n')}\n`;
+if (/<copyright holders>|<owner>/.test(notices)) throw new Error('Unresolved upstream copyright placeholder');
+output('THIRD-PARTY-NOTICES.txt', notices);
 console.log(`Third-party materials ${check ? 'verified' : 'generated'}: ${packages.length} npm packages, ${rust.packages.length} Rust crates, ${sources.length} source archives.`);
