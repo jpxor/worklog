@@ -49,3 +49,10 @@ not just this configuration. Linux system libraries supplied by the OS are cover
 by distribution packages; AppImage-bundled native libraries also require review of
 the produced image's contents and upstream notices. This remains a packaging audit
 item until the generated AppImage has been inspected.
+
+CI extracts NSIS, Debian and AppImage outputs and runs `verify-distribution.mjs`
+against the payloads. It also uploads an AppImage file-type inventory for native
+library review. Extraction checks establish that materials are present; installed
+application smoke tests and native-library licensing review remain separate.
+Previously published private releases need their own version-matched materials
+before a visibility change exposes their existing downloads.
