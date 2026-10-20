@@ -1,0 +1,38 @@
+[
+  {
+    "file": "liberation-fonts-1.07.4.tar.gz",
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-liberation/fonts-liberation_1.07.4.orig.tar.gz",
+    "license": "GPL-2.0 with Liberation font exceptions",
+    "sha256": "ad98b7498dc2992f7f0868f79b65ce4a720a3acdb63ab3f1f1cb6881117a5406"
+  },
+  {
+    "file": "cssparser-0.37.0.crate",
+    "url": "https://static.crates.io/crates/cssparser/cssparser-0.37.0.crate",
+    "license": "MPL-2.0",
+    "sha256": "8c9cdaae01d5ed7882b04d795e7f752f46ff52d2fa3b50a20d28c464510bba98"
+  },
+  {
+    "file": "cssparser-macros-0.7.1.crate",
+    "url": "https://static.crates.io/crates/cssparser-macros/cssparser-macros-0.7.1.crate",
+    "license": "MPL-2.0",
+    "sha256": "d045de693cb712d0b22c6a64be5b953f67b3ce00ab5ad3dd5d8b441886ab8e1a"
+  },
+  {
+    "file": "dtoa-short-0.3.5.crate",
+    "url": "https://static.crates.io/crates/dtoa-short/dtoa-short-0.3.5.crate",
+    "license": "MPL-2.0",
+    "sha256": "cd1511a7b6a56299bd043a9c167a6d2bfb37bf84a6dfceaba651168adfb43c87"
+  },
+  {
+    "file": "option-ext-0.2.0.crate",
+    "url": "https://static.crates.io/crates/option-ext/option-ext-0.2.0.crate",
+    "license": "MPL-2.0",
+    "sha256": "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+  },
+  {
+    "file": "selectors-0.38.0.crate",
+    "url": "https://static.crates.io/crates/selectors/selectors-0.38.0.crate",
+    "license": "MPL-2.0",
+    "sha256": "8adfa1c298912827b8a28b223b3b874357397ae706e6190acd9bf28cee99114d"
+  }
+]

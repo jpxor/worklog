@@ -28,7 +28,9 @@
   "bundle": {
     "active": true,
     "resources": {
-      "../LICENSE": "licenses/WorkLog-LICENSE.txt"
+      "../LICENSE": "licenses/WorkLog-LICENSE.txt",
+      "../THIRD-PARTY-NOTICES.txt": "licenses/THIRD-PARTY-NOTICES.txt",
+      "../third-party/": "licenses/third-party/"
     },
     "targets": "all",
     "shortDescription": "Project notes and time, kept local",
@@ -41,14 +43,3 @@
     ]
   }
 }
-
-
-
-
-
-
-
-
-
-
-

@@ -42,6 +42,8 @@ Run these before submitting code changes:
 
 ```sh
 npm run test:release
+npm run test:notices
+npm run notices:check
 npm run release:check
 npm test
 npm run build
@@ -74,3 +76,5 @@ For visible changes, check light/dark appearance, keyboard navigation, popup dis
 - If Rust or the linker is missing, check PATH and the matching native compiler/SDK installation. On Linux, missing GTK/WebKit packages are native dependency errors, not npm dependency errors.
 - Workspace format errors require a format-3 workspace. Do not modify a real workspace marker to bypass the check. Back up user data before testing compatibility changes.
 - Never commit workspace folders, `.env` files, credentials, real logs, build output, or generated PDF assets. Inspect `git diff` and `git status` before opening a PR.
+
+Dependency changes also require regenerating and reviewing [third-party materials](third-party.md). Run `npm audit --audit-level=high`, `cargo audit --file src-tauri/Cargo.lock` (cargo-audit 0.22.2), and Gitleaks 8.30.1 before release. Weekly/PR security checks retain advisory warnings; investigate findings rather than adding blanket suppressions. See [repository security](repository-security.md).

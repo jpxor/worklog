@@ -4,6 +4,9 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Include complete dependency/asset notices and Liberation font/MPL corresponding sources in installers and portable archives. Windows portable downloads use ZIP so licensing materials accompany the executable.
+- Add automated license freshness, secret and dependency-security checks.
+
 ## 0.1.26
 
 - Since the last published release (0.1.21): add tasks with independent project codes, global notes, per-task tab sessions, and updated reports/MCP tools. Require workspace format 3; older formats are rejected without automatic migration.
@@ -59,7 +62,7 @@ Task notes and time tracking in a local desktop app.
 | Platform | File | Use |
 | --- | --- | --- |
 | Windows x64 | `*_x64-setup.exe` | Installer; recommended for Windows. |
-| Windows x64 | `WorkLog-windows-x64.exe` | Standalone app executable; requires WebView2. |
+| Windows x64 | `WorkLog-windows-x64.zip` | Portable archive with executable, licenses and corresponding source; requires WebView2. |
 | Linux x86-64 | `*.deb` | Debian/Ubuntu package, built on Ubuntu 22.04. |
 | Linux x86-64 | `*.AppImage` | AppImage; mark executable before launching. |
 | Linux x86-64 | `WorkLog-linux-x64.tar.gz` | Standalone executable; requires GTK 3 and WebKitGTK 4.1 runtime libraries. |

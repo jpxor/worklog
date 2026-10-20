@@ -115,7 +115,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for expected development practices, bug r
 
 ## License
 
-Original WorkLog code, documentation, and original assets are licensed under [Apache-2.0](LICENSE). Third-party components and imported material retain their own licenses and notices. The dependency/asset attribution audit and binary notice packaging remain open items in the [publication readiness checklist](docs/open-source-readiness.md); applying this source license does not complete that audit.
+Original WorkLog code, documentation, and original assets are licensed under [Apache-2.0](LICENSE). Third-party components and imported material retain their own licenses and notices. See [third-party notices](THIRD-PARTY-NOTICES.txt) and the [distribution materials guide](docs/third-party.md). The [publication readiness checklist](docs/open-source-readiness.md) records remaining installer and native-library verification.
 
 ## Documentation
 
