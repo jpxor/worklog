@@ -22,6 +22,8 @@ Verified on 2026-10-20 while the repository remained private:
 uses no personal token and does not run `pull_request_target`. Findings must be
 investigated and fixed; do not add blanket ignores to make checks pass. Neither
 these checks nor Dependency alerts are a general application security audit.
+Tag-triggered releases call the same security workflow and require its success
+alongside both desktop builds before the release job can run.
 
 The initial npm audit found zero vulnerabilities. RustSec 0.22.2 reported no
 vulnerabilities and five informational warnings: `proc-macro-error` 1.0.4
