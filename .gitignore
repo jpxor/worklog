@@ -7,3 +7,6 @@ src-tauri/target/
 public/pdfjs/
 
 .test-tmp/
+.env
+.env.*
+!.env.example

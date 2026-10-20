@@ -1,3 +1,21 @@
+# Release notes
+
+Add user-facing changes to Unreleased. Maintainers move them into a version section before tagging; see [releasing](releasing.md). The release workflow publishes only the matching version section and shared download guidance below.
+
+## Unreleased
+
+## 0.1.26
+
+- Since the last published release (0.1.21): add tasks with independent project codes, global notes, per-task tab sessions, and updated reports/MCP tools. Require workspace format 3; older formats are rejected without automatic migration.
+- Include Project/Day/Task report views, copy-success feedback, sidebar and time-entry refinements, and the editor search layout fix prepared in versions 0.1.22–0.1.25.
+- Add optional private-network HTTP for MCP; TLS remains the default for network sharing and is required for public interface addresses.
+- Add opt-in native timesheet reminders with weekday and local-time settings, a test notification, and at most one scheduled notification per day across restarts. WorkLog must remain open; Windows notifications should be tested from an installed build.
+- Add contributor and development guides, issue/PR templates, Apache-2.0 licensing, and a documented release process with version and release-note validation.
+- Harden release automation with pinned Actions, dependency-update checks, and enforcement that release commits belong to main. Assemble release assets in a draft before automatic publication.
+- Update the Vitest development test runner to a patched 4.1 release, resolving the npm audit findings in the previous test-tool dependencies.
+- Workspace compatibility: format 3 is unchanged; no migration is required for existing format-3 workspaces.
+- Validation: Windows and Linux automated checks and packaging run in CI. Clean-machine installation, upgrade, and installed notification delivery remain unverified; builds are unsigned on Windows.
+
 ## 0.1.25
 
 - Confirm successful report copying with a brief Copied! message on the Copy button. Reset the confirmation when the report changes or closes.
@@ -33,6 +51,8 @@ Task notes and time tracking in a local desktop app.
 - Keep data in plain-text files: Markdown/UTF-8 notes and a JSON Lines time ledger. Image and PDF attachments retain their original formats.
 - Keep local Git history and back up to a folder or Git remote, manually or on a daily schedule while the app is open. Git history and remote backups require Git.
 - Optionally connect an assistant through the authenticated, read-only MCP endpoint. Sharing is off at launch.
+
+<!-- release-downloads -->
 
 ## Downloads
 

@@ -1574,3 +1574,10 @@ kbd {
 .time-entry-fields input { min-width: 0; }
 .time-entry-fields > label > input { display: block; }
 .time-entry-form > label > div { margin-top: 7px; }
+
+.reminder-settings > fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.reminder-settings fieldset fieldset { border: 0; padding: 0; margin: 0; }
+.reminder-settings .reminder-option { display: flex; align-items: center; gap: 8px; }
+.reminder-settings .reminder-option input { width: auto; margin: 0; }
+.reminder-days { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-top: 8px; }
+.reminder-settings .settings-actions { flex-wrap: wrap; }

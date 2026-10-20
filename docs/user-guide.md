@@ -6,36 +6,11 @@ WorkLog was previously named WorkNotes. The application identity and backup dest
 
 ## Development
 
-Install Node.js 22.13 or newer, Git, and Rust. On Windows, use Rust MSVC with Visual C++ build tools or Rust GNU with a compatible MinGW compiler. Windows also requires WebView2. On Ubuntu 22.04 install:
-
-```sh
-sudo apt-get update
-sudo apt-get install -y build-essential curl libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-```
-
-Then:
-
-```sh
-npm ci
-npm run tauri dev
-```
-
-`npm run dev` opens only an interface preview. It cannot access or save real data; use the Tauri command for the local application.
-
-On this Windows development computer, Rust GNU and MSYS2 GCC are available. `./scripts/desktop.ps1 dev` adds their locations to the current process PATH and starts the desktop app. Use `./scripts/desktop.ps1 build` to produce a Windows installer. This script does not change the machine's permanent PATH.
+See the [development guide](development.md) for prerequisites, fresh-clone setup, desktop execution, browser-preview limitations, and troubleshooting. Follow [CONTRIBUTING.md](../CONTRIBUTING.md) for expected development practices.
 
 ## Build and checks
 
-```sh
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run tauri build -- --no-bundle
-```
-
-The executable is in `src-tauri/target/release/`. To package locally on Windows, run `npm run tauri build -- --bundles nsis`; the installer is under `src-tauri/target/release/bundle/nsis/`. The included GitHub Actions workflow builds Windows installers and Ubuntu 22.04 DEB/AppImage packages when the source is hosted on GitHub. Clean-machine installation checks are separate release steps. The Linux executable requires its GTK/WebKit runtime libraries.
-
-**Ubuntu 20.04 is not yet a verified target.** Tauri 2 requires WebKitGTK 4.1. Do not assume a binary built on Ubuntu 22.04 works on 20.04. Confirm the work laptop's version and verify a suitable packaging/runtime approach before release.
+See [development checks and packaging](development.md#checks) and the [release guide](releasing.md). CI packages Windows and Ubuntu 22.04; Ubuntu 20.04, macOS, and ARM support are unverified. Clean-machine installation tests are separate from automated checks.
 
 ## Using WorkLog
 

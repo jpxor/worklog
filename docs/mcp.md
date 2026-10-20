@@ -89,3 +89,6 @@ Protocol references: [official Rust SDK](https://github.com/modelcontextprotocol
 Host means the endpoint name used by the caller (for example `10.20.30.40:43127` or an explicitly allowed corporate hostname). Origin, when present, identifies the website that initiated a request. Neither header is an allowlist of caller IP addresses. Network-level source-IP restrictions belong in the corporate firewall. Valid Host/Origin headers never replace the bearer token.
 
 Build validation also runs the frontend production bundle and a desktop development build. Clippy was unavailable in the installed Rust GNU toolchain; compiler and runtime tests provide the verified checks.
+## Privacy and security reporting
+
+See [data and privacy](privacy.md) for local settings, tokens, history, and backup retention. Report suspected vulnerabilities through the route in [SECURITY.md](../SECURITY.md); keep private workspace contents and credentials out of public issues.

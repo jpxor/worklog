@@ -1,7 +1,8 @@
 [package]
 name = "worknotes"
-version = "0.1.25"
+version = "0.1.26"
 edition = "2021"
+license = "Apache-2.0"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -9,6 +10,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

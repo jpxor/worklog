@@ -42,7 +42,7 @@ The workspace above uses light appearance; dark appearance is shown below.
 
 ## Getting started
 
-Download the Windows installer or Linux DEB/AppImage from the [latest release](https://github.com/jpxor/worklog/releases/latest). Standalone binaries are also included. Linux packages are built on Ubuntu 22.04 for x86-64; the standalone Linux binary requires GTK/WebKit runtime libraries. Release downloads require repository access while this repository is private.
+Download the Windows installer or Linux DEB/AppImage from the [latest release](https://github.com/jpxor/worklog/releases/latest). Standalone binaries are also included. Linux packages are built on Ubuntu 22.04 for x86-64; the standalone Linux binary requires GTK/WebKit runtime libraries. Windows builds are unsigned. macOS and ARM builds are unverified. WorkLog is early-stage software; back up your workspace before upgrading.
 
 1. Launch the WorkLog desktop app and choose an empty local data folder, or open an existing WorkLog workspace.
 2. Create a task and its default project code inline, then add a note or use **Today's log** to start a dated daily entry.
@@ -60,6 +60,8 @@ Task notes and time records use **plain-text storage** in a local folder you cho
 
 WorkLog supports local Git history, scheduled backups to a Git remote or folder, and manual backups. Git history requires Git on your PATH. Scheduled backups run while the app is open, and remote backups use your existing SSH keys or Git credential helper.
 
+Settings → Timesheet reminders lets you enable native OS notifications at a local time on selected weekdays. Reminders are off by default and require notification permission. Use Test notification to check delivery. Keep WorkLog open (minimized is fine); reminders do not run after quitting. A missed reminder is delivered when the app next runs on that selected day, with at most one scheduled notification per day across restarts. On Windows, test notifications from an installed build; system notification settings and Do Not Disturb can suppress banners.
+
 See [history and backups](docs/user-guide.md#history-and-backups) for scheduling, restore steps, and what backups include.
 
 ## Development
@@ -71,7 +73,7 @@ Built with **Tauri 2, React 19, TypeScript, Rust, and CodeMirror 6**.
 - Node.js **22.13 or newer** and npm.
 - Git and a Rust toolchain.
 - Windows: compatible C++ build tools and WebView2.
-- Ubuntu 22.04: GTK/WebKit build dependencies listed in the [development guide](docs/user-guide.md#development).
+- Ubuntu 22.04: GTK/WebKit build dependencies listed in the [development guide](docs/development.md).
 
 ### Run locally
 
@@ -93,21 +95,34 @@ The browser preview uses sample data and cannot save a real workspace.
 ```sh
 npm test
 npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+npm run test:release
+npm run release:check
 npm run tauri build
 ```
 
 The included [GitHub Actions workflow](.github/workflows/build.yml) runs checks and builds Windows NSIS installers and Ubuntu 22.04 DEB/AppImage packages. Local build output is under `src-tauri/target/release/`; packaged installers are under its `bundle/` directory. Ubuntu 20.04 compatibility is not verified.
 
-See the [build guide](docs/user-guide.md#build-and-checks) for the Windows helper script and additional build details.
+See the [development guide](docs/development.md) for setup, the Windows helper script, checks, and packaging, and [architecture](docs/architecture.md) for module boundaries and workspace invariants.
 
-Pushing a `v` version tag runs the same checks and builds, then creates a GitHub release with installers, standalone binaries, and SHA-256 checksums. The tag must match the version in `package.json` and `src-tauri/tauri.conf.json`.
+Pushing a `vX.Y.Z` tag runs checks/builds and automatically publishes a GitHub release with installers, standalone binaries, and SHA-256 checksums. All npm/Cargo/Tauri version metadata and release notes must agree. Follow the [release guide](docs/releasing.md) for version updates, release notes, testing, publication, and recovery.
 
-The GitHub Pages source is in [`site/`](site/). It is prepared but unpublished: Pages requires a paid GitHub plan for this private repository. After enabling Pages with GitHub Actions in repository settings, run the **Deploy project page** workflow manually.
+The GitHub Pages source is in [`site/`](site/). After enabling Pages with GitHub Actions in repository settings, run the **Deploy project page** workflow manually. Availability depends on repository settings; release tags do not deploy the site.
+
+## Contributing and support
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for expected development practices, bug reports, pull requests, and review. Use [GitHub Issues](https://github.com/jpxor/worklog/issues) for ordinary bugs and feature requests, with sanitized examples. Follow [SECURITY.md](SECURITY.md) for suspected vulnerabilities and [privacy](docs/privacy.md) for data handling. Maintainers respond as time permits.
+
+## License
+
+Original WorkLog code, documentation, and original assets are licensed under [Apache-2.0](LICENSE). Third-party components and imported material retain their own licenses and notices. The dependency/asset attribution audit and binary notice packaging remain open items in the [publication readiness checklist](docs/open-source-readiness.md); applying this source license does not complete that audit.
 
 ## Documentation
 
 - [User guide](docs/user-guide.md) — everyday workflows, shortcuts, data formats, and backups.
+- [Contributing](CONTRIBUTING.md) and [development](docs/development.md) — setup, practices, checks, and review.
+- [Release guide](docs/releasing.md) and [release notes](docs/release-notes.md) — versioning, publication, and changes.
+- [Publication readiness](docs/open-source-readiness.md) — remaining owner audits and GitHub configuration.
 - [LLM connection guide](docs/mcp.md) — MCP setup, authentication, tools, and retrieval examples.
 - [Product specification](SPEC.md) — requirements and implementation context.
 - [Task review design](docs/project-review.md) — review evidence, current capabilities, and proposed workflows.

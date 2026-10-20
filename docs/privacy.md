@@ -1,0 +1,11 @@
+# Data and privacy
+
+WorkLog stores notes, time records, project codes, and attachments in the workspace folder you choose. Notes and ledger files are plain text, and local storage does not encrypt them. OS permissions, device security, and any synchronization service on that folder affect who can access the data.
+
+App settings live separately in Tauri's application data directory for `local.worknotes.desktop`. Backend configuration includes the selected workspace and backup settings (`settings.json`), MCP configuration and bearer token (`mcp-sharing.json`), and reminder settings (`timesheet-reminder.json`). UI preferences such as appearance, shortcuts, and tab/editor state use WebView local storage. Treat application data as sensitive too; avoid publishing settings files or a real WebView profile.
+
+Local Git history and configured folder/Git backups can preserve previous versions of edited or deleted records. Git remotes use your installed Git and existing credentials; remote providers and folder synchronization services have their own access and retention policies. Deleting a note or sending it to Trash does not erase its history, backups, synchronized copies, or OS recovery copies. See [backup and recovery](user-guide.md#history-and-backups).
+
+MCP sharing starts manually for the current app session and provides read-only access to the selected workspace. Anyone with the bearer token and permitted network access can read shared records and available Git history, including closed tasks. Configure TLS for network connections; the optional private-network HTTP setting is for a trusted network or encrypted VPN. The assistant service you connect may process or retain returned information under its own policies. WorkLog supplies data and does not itself call an LLM. See [MCP setup and access boundaries](mcp.md).
+
+PDF rendering uses locally bundled PDF.js resources. Backups, MCP, external links, and OS notification delivery have different data paths; local storage is not a promise that data can never leave the device. Review new dependencies and outbound behavior when changing rendering or integrations, and use synthetic data in development and public reports. Report suspected exposure through [SECURITY.md](../SECURITY.md).
