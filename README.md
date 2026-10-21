@@ -42,7 +42,7 @@ The workspace above uses light appearance; dark appearance is shown below.
 
 ## Getting started
 
-Download the Windows installer or Linux DEB/AppImage from the [latest release](https://github.com/jpxor/worklog/releases/latest). Standalone binaries are also included. Linux packages are built on Ubuntu 22.04 for x86-64; the standalone Linux binary requires GTK/WebKit runtime libraries. Windows builds are unsigned. macOS and ARM builds are unverified. WorkLog is early-stage software; back up your workspace before upgrading.
+Download the Windows installer or Linux DEB from the [latest release](https://github.com/jpxor/worklog/releases/latest). Portable archives include the executable and required licensing materials. Linux packages are built on Ubuntu 22.04 for x86-64; the standalone Linux binary requires GTK/WebKit runtime libraries. Windows operation is owner-confirmed; builds are unsigned. Ubuntu 22.04 installation testing is pending with public testers. Ubuntu 20.04 is unsupported and failed to install in owner testing. AppImage downloads are withheld pending native-library licensing review. macOS and ARM builds are unverified. WorkLog is early-stage software; back up your workspace before upgrading.
 
 1. Launch the WorkLog desktop app and choose an empty local data folder, or open an existing WorkLog workspace.
 2. Create a task and its default project code inline, then add a note or use **Today's log** to start a dated daily entry.

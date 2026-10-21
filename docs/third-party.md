@@ -14,6 +14,12 @@ Original WorkLog code remains Apache-2.0.
 
 ## Updating
 
+For the 0.1.27 tester launch, AppImage distribution is withheld pending the
+native-library review. Supported download formats are Windows NSIS/portable ZIP
+and Linux DEB/portable tarball. CI artifact downloads include the same notices
+and corresponding sources beside the executables. Installation smoke testing is
+waived by the owner for this launch; Ubuntu 22.04 testing is pending with testers.
+
 After `npm ci`, run `npm run notices:generate` then `npm run notices:check`.
 When Cargo.lock, Cargo.toml or about.toml changes, first use cargo-about **0.9.2**
 from its official checksum-verified release (or `cargo install cargo-about --version

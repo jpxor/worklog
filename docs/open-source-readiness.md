@@ -2,6 +2,21 @@
 
 This checklist records work that must be verified before the first public source/binary release. Documentation and a license do not establish that historical material, third-party assets, or repository settings have been audited. Do not mark items complete without recording evidence in the release PR or maintainer records.
 
+## Tester launch decision (2026-10-21)
+
+The owner authorized public visibility and withdrawal of legacy releases lacking
+complete licensing materials. Additional installation testing is waived for this
+tester launch: Windows operation is owner-confirmed, Ubuntu 22.04 testing is
+delegated to public testers, and Ubuntu 20.04 installation failed and is unsupported.
+This waiver supersedes the clean-machine launch gate below; it is not a claim of
+Ubuntu installation validation. Existing CI checks remain enabled.
+
+Version 0.1.27 prepares Windows installer/portable ZIP and Ubuntu 22.04 DEB/portable
+tarball downloads with notices and corresponding sources. CI downloads also carry
+these materials. AppImage distribution is withheld until bundled native-library
+licensing has been reviewed. Actual legacy-release withdrawal, GitHub security
+settings, and visibility changes must be recorded after they have been verified.
+
 ## Implemented in this preparation
 
 - Apache-2.0 source license and npm/Cargo license metadata; npm remains private to prevent accidental registry publication. Installer resources and standalone release assets include the WorkLog license; resolved third-party notices and corresponding font/MPL sources now have distribution packaging. Native AppImage library attribution and installed-package inspection remain open.
