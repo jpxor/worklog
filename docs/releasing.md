@@ -79,10 +79,12 @@ Replace `<reviewed-main-commit-sha>` with the exact commit whose successful `mai
 
 Check the Actions run and [Releases](https://github.com/jpxor/worklog/releases). Verify the tag points to the reviewed commit and the body contains only that version's changes plus download guidance. Expected assets:
 
-- Windows NSIS installer and `WorkLog-windows-x64.exe`.
+- Windows NSIS installer and `WorkLog-windows-x64.zip`.
 - Linux `.deb`, `.AppImage`, and `WorkLog-linux-x64.tar.gz` containing `worknotes`.
 - `SHA256SUMS.txt`, covering all other release files.
-- `LICENSE.txt`, accompanying standalone downloads; the Linux archive also contains `LICENSE`. Installers include the WorkLog license resource at `licenses/WorkLog-LICENSE.txt` relative to the platform's Tauri resource directory. Third-party notice completeness must be verified separately.
+- `LICENSE.txt`, `THIRD-PARTY-NOTICES.txt`, and `WorkLog-third-party.tar.gz`. Portable archives include the license, notices, full inventory and corresponding source; installers include the same materials under `licenses/` relative to Tauri's resource directory. See [third-party materials](third-party.md).
+
+Run `npm run notices:check` and `npm run test:notices` before tagging. Inspect the actual installed resources on Windows and Linux, and review native libraries bundled into AppImage before public distribution. A configured resource map alone does not establish package completeness. The Windows portable download is now a ZIP so attribution and source travel with its executable.
 
 Download assets and verify checksums from the download directory on Linux with `sha256sum --check SHA256SUMS.txt`. On Windows use `Get-FileHash -Algorithm SHA256 <download>` and compare with the corresponding manifest entry. Checksums detect file changes; they are not a signing mechanism. Repeat an installed-app smoke test with the published assets. Verify any required license resources and anonymous download access for a public release.
 

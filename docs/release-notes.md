@@ -4,6 +4,16 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+## 0.1.27
+
+- Update rustls-webpki and webpki-root-certs to fix the certificate trust issues reported as RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
+
+- Include complete dependency/asset notices and Liberation font/MPL corresponding sources in installers and portable archives. Windows portable downloads use ZIP so licensing materials accompany the executable.
+- Add automated license freshness, secret and dependency-security checks.
+- Withhold AppImage downloads pending the bundled native-library licensing review; provide Ubuntu 22.04 DEB and portable archives.
+- Windows operation is owner-confirmed. Ubuntu 22.04 installation testing is pending with public testers; Ubuntu 20.04 installation failed and is unsupported. Additional installation testing was waived by the owner for this tester launch.
+- Workspace format 3 is unchanged; no migration is required.
+
 ## 0.1.26
 
 - Since the last published release (0.1.21): add tasks with independent project codes, global notes, per-task tab sessions, and updated reports/MCP tools. Require workspace format 3; older formats are rejected without automatic migration.
@@ -59,13 +69,12 @@ Task notes and time tracking in a local desktop app.
 | Platform | File | Use |
 | --- | --- | --- |
 | Windows x64 | `*_x64-setup.exe` | Installer; recommended for Windows. |
-| Windows x64 | `WorkLog-windows-x64.exe` | Standalone app executable; requires WebView2. |
+| Windows x64 | `WorkLog-windows-x64.zip` | Portable archive with executable, licenses and corresponding source; requires WebView2. |
 | Linux x86-64 | `*.deb` | Debian/Ubuntu package, built on Ubuntu 22.04. |
-| Linux x86-64 | `*.AppImage` | AppImage; mark executable before launching. |
 | Linux x86-64 | `WorkLog-linux-x64.tar.gz` | Standalone executable; requires GTK 3 and WebKitGTK 4.1 runtime libraries. |
 | All | `SHA256SUMS.txt` | SHA-256 checksums for the files above. |
 
-Windows builds are unsigned. Linux builds target Ubuntu 22.04; Ubuntu 20.04 compatibility and clean-machine installation have not been verified. Automated checks run before publication; they do not replace installation testing on your machine.
+Windows builds are unsigned. Linux builds target Ubuntu 22.04; Ubuntu 20.04 is unsupported (installation failed in owner testing). Ubuntu 22.04 installation testing is pending with public testers. Automated checks run before publication; they do not replace installation testing on your machine.
 
 On first launch, choose an empty local data folder or an existing WorkLog workspace. This build requires format 3; older workspaces are not upgraded on opening.
 

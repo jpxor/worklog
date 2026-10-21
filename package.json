@@ -1,6 +1,6 @@
 {
   "name": "worknotes",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -15,7 +15,10 @@
     "test": "vitest run",
     "test:release": "node --test scripts/release-tests.mjs",
     "release:check": "node scripts/release.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "notices:generate": "node scripts/third-party.mjs",
+    "notices:check": "node scripts/third-party.mjs --check",
+    "test:notices": "node --test scripts/third-party-tests.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.3.0",

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "WorkLog",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "identifier": "local.worknotes.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -28,7 +28,9 @@
   "bundle": {
     "active": true,
     "resources": {
-      "../LICENSE": "licenses/WorkLog-LICENSE.txt"
+      "../LICENSE": "licenses/WorkLog-LICENSE.txt",
+      "../THIRD-PARTY-NOTICES.txt": "licenses/THIRD-PARTY-NOTICES.txt",
+      "../third-party/": "licenses/third-party/"
     },
     "targets": "all",
     "shortDescription": "Project notes and time, kept local",
@@ -41,14 +43,3 @@
     ]
   }
 }
-
-
-
-
-
-
-
-
-
-
-
