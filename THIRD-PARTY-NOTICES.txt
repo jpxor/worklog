@@ -378,7 +378,7 @@ rmcp@3.5.1: Apache-2.0
 rustc-hash@2.1.3: Apache-2.0 OR MIT
 rustix@1.1.5: Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
 rustls-pki-types@1.15.1: MIT OR Apache-2.0
-rustls-webpki@0.103.15: ISC
+rustls-webpki@0.103.16: ISC
 rustls@0.23.46: Apache-2.0 OR ISC OR MIT
 rustversion@1.0.23: MIT OR Apache-2.0
 same-file@1.0.6: Unlicense OR MIT
@@ -12319,7 +12319,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-ISC: rustls-webpki@0.103.15
+ISC: rustls-webpki@0.103.16
 ========================================================================
 Except as otherwise noted, this project is licensed under the following
 (ISC-style) terms:

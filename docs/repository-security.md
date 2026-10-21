@@ -36,6 +36,14 @@ whether the affected GLib iterator is used before treating this as resolved.
 
 ## Public launch settings
 
+The 2026-10-21 launch audit identified RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
+Version 0.1.27 updates rustls-webpki from 0.103.15 to 0.103.16 and
+webpki-root-certs from 1.0.9 to 1.0.10. A refreshed RustSec database (1,348
+advisories) then reported no vulnerabilities; the five informational warnings
+above remain. The local scanner could not refresh the crate index, but did
+refresh the advisory database and scan the updated lockfile; CI remains the
+release gate.
+
 After an explicitly approved visibility change, enable and verify:
 
 1. A `main` branch ruleset requiring PRs, resolved conversations, current successful

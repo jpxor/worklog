@@ -6,6 +6,8 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## 0.1.27
 
+- Update rustls-webpki and webpki-root-certs to fix the certificate trust issues reported as RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
+
 - Include complete dependency/asset notices and Liberation font/MPL corresponding sources in installers and portable archives. Windows portable downloads use ZIP so licensing materials accompany the executable.
 - Add automated license freshness, secret and dependency-security checks.
 - Withhold AppImage downloads pending the bundled native-library licensing review; provide Ubuntu 22.04 DEB and portable archives.
