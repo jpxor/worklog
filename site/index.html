@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="WorkLog is a desktop app for task and global notes and time tracking, with plain-text data storage, Markdown timesheets, and scheduled backups.">
-  <title>WorkLog — Task and global notes and time tracking</title>
+  <meta name="description" content="A personal work notebook with time tracking. Keep daily logs, write notes in open plain-text formats, and review your time to help fill in timesheets.">
+  <title>WorkLog — A personal work notebook with time tracking</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,14 +17,14 @@
   </header>
   <main>
     <section class="intro" aria-labelledby="intro-title">
-      <p class="eyebrow">Windows &amp; Linux desktop app</p>
-      <h1 id="intro-title">Task and global notes and time tracking, <br>stored in local files.</h1>
-      <p class="lead">Write daily logs, keep notes by task, and record the time you spend. Export timesheets when you need them. Your notes and time records stay in a folder you choose.</p>
+      <p class="eyebrow">Desktop app for Windows &amp; Ubuntu 22.04+</p>
+      <h1 id="intro-title">A personal work notebook <br>with time tracking.</h1>
+      <p class="lead">Take notes as you work, keep a daily log, and track your time. Your notes are plain-text documents you can open and edit with other apps.</p>
       <div class="actions">
-        <a class="button" href="https://github.com/jpxor/worklog/releases/latest">Download the latest release <span aria-hidden="true">↓</span></a>
+        <a class="button" href="https://github.com/jpxor/worklog/releases/latest">Download WorkLog <span aria-hidden="true">↓</span></a>
         <a href="#data">Storage &amp; backups <span aria-hidden="true">↘</span></a>
       </div>
-      <p class="download-note">Windows x64 installer · Linux x86-64 DEB · Portable archives<br>Ubuntu 22.04 testers welcome; Ubuntu 20.04 is unsupported.</p>
+      <p class="download-note">Windows x64 installer · Ubuntu x86-64 DEB · Portable archives</p>
     </section>
     <figure class="workspace">
       <img src="assets/workspace.png" alt="WorkLog task overview with notes, unfinished tasks, and a time-entry panel" width="1400" height="950">
@@ -33,22 +33,22 @@
     <section class="features" aria-labelledby="features-title">
       <h2 id="features-title">Working in WorkLog</h2>
       <dl>
-        <div><dt>Notes by task</dt><dd>Organize Markdown and text notes in folders, create dated daily logs, and keep several notes open in tabs. View images, PDFs, and Mermaid diagrams alongside your writing.</dd></div>
-        <div><dt>Tasks and search</dt><dd>Find unfinished Markdown checkboxes in the task overview. Search note text across tasks, including closed tasks, and jump to matching lines.</dd></div>
-        <div><dt>Time and timesheets</dt><dd>Enter a duration or copy elapsed time from the timer. Select or create a project code inline. Correct earlier entries, review daily and project-code totals, and export a date range as Markdown.</dd></div>
+        <div><dt>Notes and daily logs</dt><dd>Organize notes by task and keep dated daily logs. Open notes in tabs and view images, PDFs, and Mermaid diagrams alongside your writing.</dd></div>
+        <div><dt>Checklists and search</dt><dd>See unfinished checklist items from your notes in one overview. Search across active and closed tasks, then jump to the matching lines.</dd></div>
+        <div><dt>Time tracking and reports</dt><dd>Enter time manually or copy elapsed time from the timer. Review totals by day and project code to help fill in your timesheet. Edit past entries and export reports as Markdown.</dd></div>
       </dl>
     </section>
     <section class="data" id="data" aria-labelledby="data-title">
-      <div><p class="eyebrow">Storage &amp; backups</p><h2 id="data-title">Read your data<br>with a text editor.</h2></div>
+      <div><p class="eyebrow">Storage &amp; backups</p><h2 id="data-title">Your notes, usable<br>beyond WorkLog.</h2></div>
       <div class="data-copy">
-        <p>Notes are Markdown or UTF-8 text files. Time records are stored as JSON Lines in <code>time.jsonl</code>. You can read both with a text editor outside WorkLog. Images and PDFs keep their original formats.</p>
-        <p>Keep local Git history and back up to a folder or Git remote. Run backups manually or on a daily schedule while the app is open. Git history and remote backups require Git; remote backups use your existing SSH keys or credential helper.</p>
+        <p>Your notes use open formats: Markdown and plain text. Open and edit them with any text editor, even if you stop using WorkLog. Time records are also readable as plain text. Images and PDFs keep their original formats.</p>
+        <p>Back up to a folder or Git remote, manually or daily while WorkLog is open. Git is optional: add it for note version history and remote backups.</p>
         <a href="https://github.com/jpxor/worklog/blob/main/docs/user-guide.md#history-and-backups">Backup and restore instructions ↗</a>
       </div>
     </section>
     <section class="assistant" aria-labelledby="assistant-title">
       <h2 id="assistant-title">Ask an assistant about your work</h2>
-      <p>Connect a compatible assistant through the read-only MCP endpoint to search saved notes, retrieve time entries, and inspect Git history. Use those records to summarize a period of work or draft a review. Sharing is off at launch; you start it in Settings. Authentication is required, with TLS for network connections unless you explicitly allow HTTP on a trusted private network.</p>
+      <p>Connect a compatible AI assistant to summarize your work or draft a review from saved notes and time entries. Access uses MCP and is read-only. Sharing is off each time you open WorkLog; start it in Settings.</p>
       <a href="https://github.com/jpxor/worklog/blob/main/docs/mcp.md">Connection guide ↗</a>
     </section>
   </main>
