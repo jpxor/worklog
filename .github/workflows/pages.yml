@@ -1,5 +1,11 @@
 name: Deploy project page
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/screenshots/project-overview-light.png'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
   contents: read
