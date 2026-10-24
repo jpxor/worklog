@@ -107,7 +107,7 @@ See the [development guide](docs/development.md) for setup, the Windows helper s
 
 Pushing a `vX.Y.Z` tag runs checks/builds and automatically publishes a GitHub release with installers, standalone binaries, and SHA-256 checksums. All npm/Cargo/Tauri version metadata and release notes must agree. Follow the [release guide](docs/releasing.md) for version updates, release notes, testing, publication, and recovery.
 
-The GitHub Pages source is in [`site/`](site/). After enabling Pages with GitHub Actions in repository settings, run the **Deploy project page** workflow manually. Availability depends on repository settings; release tags do not deploy the site.
+The GitHub Pages source is in [`site/`](site/). With Pages enabled using GitHub Actions in repository settings, the **Deploy project page** workflow automatically deploys changes to `site/`, its source screenshot (`docs/screenshots/project-overview-light.png`), or the Pages workflow when pushed to `main`. The workflow can also be run manually. Release tags do not deploy the site.
 
 ## Contributing and support
 
