@@ -70,9 +70,15 @@ Images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.svg`, `.ico`) and `.
 
 The data folder is a separate Git repository. Git commits use a local WorkLog identity. Files save even if Git is missing; the status reports history errors. Background local history commits run every 30 seconds, without pushing or copying backups. Git must be on PATH for Git history and remote backups. WorkLog uses configured SSH keys or Git credential helpers and disables interactive credential prompts; authenticate with your provider outside the app first.
 
+WorkLog disables Git hooks and external filesystem monitors for its Git commands, including opening workspaces, history reads, cloning, and backups. Hooks remain on disk for other Git clients, but WorkLog does not run them. Git attributes/filters and credential helpers are separate Git features; this is not a general sandbox for untrusted repositories.
+
 External backups run once daily at the local time selected in Settings (default 17:00). While the app is open, the schedule is checked every 30 seconds. A background check shortly after startup catches up the most recent missed daily backup, including before today's scheduled time. WorkLog compares data contents with the last completed backup and skips unchanged data. Both configured destinations are attempted. Failed backups remain due and retry every 10 minutes while open; the status bar and Settings show the error. Back up now remains available. The app must be open to perform a backup; no separate service runs when it is closed. Backup progress and the last successful content fingerprint are kept in machine-local settings.
 
 Settings can connect a remote to the current workspace, or clone an empty/existing WorkLog repository into a new local folder. Remote changes are not automatically merged and force-push is never used. A rejected push leaves local records intact.
+
+Git backups require exactly one effective push destination matching the Remote URL displayed in Settings. A hidden push URL, multiple destinations, or a conflicting push rewrite stops the remote backup with an error; the configured file-copy backup is still attempted. Save backup settings to replace local push URLs with the chosen URL, even when the displayed URL has not changed. If the error persists, review inherited Git URL configuration. Saving settings does not push data immediately.
+
+Whole-workspace backup coverage is intentional. All workspace files are eligible for Git history under its existing ignore rules, and file-copy backups include the entire folder and Git history. Keep passwords, private keys, and other secrets outside the workspace. There is no automatic secret scanner or file filtering; deleted files may remain in history and older backups.
 
 Alternatively choose a backup parent folder, including a mounted network location. Back up now writes `WorkNotes-backup` inside it, including Git history. It stages the new copy before replacing the old backup. It retains one completed snapshot. If replacement is interrupted, inspect the `.previous` directory before retrying. Keep this destination outside the working data folder.
 

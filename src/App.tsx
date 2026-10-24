@@ -2502,6 +2502,10 @@ export default function App() {
                   WorkLog data into a new local folder. Git uses your configured
                   SSH keys or credential helper.
                 </p>
+                <p className="muted small">
+                  Backups include all workspace files and Git history. Keep
+                  passwords, private keys, and other secrets outside this folder.
+                </p>
                 <label>
                   Remote URL
                   <input
@@ -2576,8 +2580,8 @@ export default function App() {
                   Browse…
                 </button>
                 <p className="muted small">
-                  Replaces the previous WorkLog backup. Includes local Git
-                  history.
+                  Replaces the previous WorkLog backup. Includes all workspace
+                  files and local Git history.
                 </p>
                 <h3>Daily backup</h3>
                 <label>

@@ -134,8 +134,25 @@ fn read_json(path: &Path) -> Result<Value> {
     serde_json::from_slice(&fs::read(path).map_err(err)?).map_err(err)
 }
 
-fn git(root: &Path, args: &[&str]) -> Result<String> {
+// Command-line overrides also apply to Git subprocesses (including clone).
+// Keep the same policy for history reads and backup/storage operations.
+pub(crate) fn git_command() -> Command {
     let mut command = Command::new("git");
+    command.args([
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "maintenance.auto=false",
+        "-c",
+        "gc.auto=0",
+    ]);
+    command
+}
+
+fn git(root: &Path, args: &[&str]) -> Result<String> {
+    let mut command = git_command();
     command
         .arg("-C")
         .arg(root)
@@ -486,6 +503,20 @@ impl Workspace {
             .ok()
             .and_then(|p| git(&p, &["remote", "get-url", "origin"]).ok())
             .unwrap_or_default()
+    }
+    fn check_push_destination(&self, remote: &str) -> Result<()> {
+        if remote.is_empty() {
+            return Ok(());
+        }
+        let destinations = git(
+            &self.root()?,
+            &["remote", "get-url", "--push", "--all", "origin"],
+        )?;
+        let mut urls = destinations.lines();
+        if urls.next() != Some(remote) || urls.next().is_some() {
+            return Err("Git push destinations differ from the Remote URL in Settings. Save backup settings to use that URL as the only push destination. If this persists, review inherited Git URL configuration.".into());
+        }
+        Ok(())
     }
     fn commit(&mut self) {
         let result = (|| -> Result<()> {
@@ -954,7 +985,7 @@ impl Workspace {
                     return Err("Choose a valid daily backup time".into());
                 }
                 let root = self.root()?;
-                if remote.starts_with('-') || remote.contains('\n') {
+                if remote.starts_with('-') || remote.contains(['\n', '\r']) {
                     return Err("Invalid remote URL".into());
                 }
                 if !backup.is_empty() {
@@ -962,6 +993,7 @@ impl Workspace {
                 }
                 self.commit();
                 let old = self.remote();
+                let push_changed = self.check_push_destination(&old).is_err();
                 if remote.is_empty() {
                     if !old.is_empty() {
                         git(&root, &["remote", "remove", "origin"])?;
@@ -970,11 +1002,28 @@ impl Workspace {
                     let operation = if old.is_empty() { "add" } else { "set-url" };
                     git(&root, &["remote", operation, "origin", remote])?;
                 }
+                if !remote.is_empty() {
+                    // Replace every local push URL, even when the displayed URL
+                    // is unchanged. Never leave an undisclosed backup target.
+                    git(
+                        &root,
+                        &[
+                            "config",
+                            "--local",
+                            "--replace-all",
+                            "remote.origin.pushurl",
+                            remote,
+                        ],
+                    )?;
+                    self.check_push_destination(&self.remote())?;
+                }
                 if remote != old
+                    || push_changed
                     || backup != self.config.backup_path
                     || time != self.config.backup_time
                 {
                     self.config.backup_slot.clear();
+                    self.config.backup_fingerprint.clear();
                     self.config.backup_error.clear();
                 }
                 self.config.backup_path = backup.into();
@@ -1048,6 +1097,9 @@ impl Workspace {
     }
     fn backup(&mut self, automatic: bool, slot: &str) -> Result<()> {
         let remote = self.remote();
+        // Check before the schedule/fingerprint fast paths, so configuration
+        // changes cannot silently retain a previously successful backup status.
+        let destination_check = self.check_push_destination(&remote);
         if remote.is_empty() && self.config.backup_path.is_empty() {
             return if automatic {
                 Ok(())
@@ -1055,7 +1107,11 @@ impl Workspace {
                 Err("Choose a Git remote or file-copy backup location".into())
             };
         }
-        if automatic && !slot.is_empty() && self.config.backup_slot.as_str() >= slot {
+        if automatic
+            && !slot.is_empty()
+            && self.config.backup_slot.as_str() >= slot
+            && destination_check.is_ok()
+        {
             return Ok(());
         }
         self.commit();
@@ -1066,7 +1122,7 @@ impl Workspace {
         self.config.backup_path.hash(&mut hash);
         hash_data(&root, &root, &mut hash)?;
         let fingerprint = format!("{:016x}", hash.finish());
-        if fingerprint == self.config.backup_fingerprint {
+        if fingerprint == self.config.backup_fingerprint && destination_check.is_ok() {
             self.config.backup_slot = slot.into();
             self.config.backup_error.clear();
             self.persist_config()?;
@@ -1075,11 +1131,13 @@ impl Workspace {
         let mut errors = Vec::new();
         if !remote.is_empty() {
             let push = (|| -> Result<()> {
+                destination_check?;
                 if !git(&root, &["status", "--porcelain"])?.is_empty() {
                     return Err(
                         "Git changes could not be committed; remote backup is incomplete".into(),
                     );
                 }
+                self.check_push_destination(&remote)?;
                 git(&root, &["push", "-u", "origin", "HEAD"])?;
                 Ok(())
             })();
@@ -1636,6 +1694,280 @@ mod tests {
             restored.snapshot().unwrap()["projects"][0]["name"],
             "Keep me"
         );
+    }
+
+    fn rejecting_hook(path: &Path) {
+        atomic(
+            path,
+            b"#!/bin/sh\nprintf 'unexpected hook execution' > hook-ran.txt\nexit 1\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+
+    #[test]
+    fn workspace_git_never_runs_default_or_configured_hooks() {
+        let (d, mut w) = setup();
+        let root = w.root().unwrap();
+        let remote = d.path().join("hook-backup.git");
+        git(
+            d.path(),
+            &[
+                "init",
+                "--bare",
+                "--initial-branch=main",
+                remote.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        for configured in [false, true] {
+            let hooks = if configured {
+                d.path().join("custom-hooks")
+            } else {
+                root.join(".git/hooks")
+            };
+            for hook in [
+                "pre-commit",
+                "prepare-commit-msg",
+                "commit-msg",
+                "post-commit",
+                "pre-push",
+                "post-checkout",
+            ] {
+                rejecting_hook(&hooks.join(hook));
+            }
+            if configured {
+                git(
+                    &root,
+                    &["config", "core.hooksPath", hooks.to_str().unwrap()],
+                )
+                .unwrap();
+            }
+            let monitor = root.join("monitor.sh");
+            rejecting_hook(&monitor);
+            git(
+                &root,
+                &["config", "core.fsmonitor", monitor.to_str().unwrap()],
+            )
+            .unwrap();
+            atomic(
+                &root.join("extra.txt"),
+                if configured { b"second" } else { b"first" },
+            )
+            .unwrap();
+            // Opening an existing workspace commits pending files.
+            w.lock = None;
+            w.open(root.to_str().unwrap()).unwrap();
+            assert_eq!(git(&root, &["status", "--porcelain"]).unwrap(), "");
+            assert!(!root.join("hook-ran.txt").exists());
+            w.dispatch(
+                "configure",
+                json!({"remote":remote.to_str().unwrap(),"backupPath":""}),
+            )
+            .unwrap();
+            w.dispatch("backup", json!({})).unwrap();
+            assert_eq!(
+                git(&remote, &["rev-parse", "refs/heads/main"]).unwrap(),
+                git(&root, &["rev-parse", "HEAD"]).unwrap()
+            );
+            let clone = d.path().join(if configured {
+                "custom-clone"
+            } else {
+                "default-clone"
+            });
+            // Also exercise hooks supplied through a clone template.
+            let template = d.path().join("clone-template");
+            rejecting_hook(&template.join("hooks/post-checkout"));
+            git(
+                d.path(),
+                &[
+                    "-c",
+                    &format!("init.templateDir={}", template.display()),
+                    "clone",
+                    "--",
+                    remote.to_str().unwrap(),
+                    clone.to_str().unwrap(),
+                ],
+            )
+            .unwrap();
+            assert!(!clone.join("hook-ran.txt").exists());
+        }
+    }
+
+    #[test]
+    fn backups_reject_hidden_push_targets_and_settings_repair_them() {
+        let (d, mut w) = setup();
+        let root = w.root().unwrap();
+        let remote = d.path().join("expected.git");
+        let hidden = d.path().join("hidden.git");
+        for destination in [&remote, &hidden] {
+            git(
+                d.path(),
+                &[
+                    "init",
+                    "--bare",
+                    "--initial-branch=main",
+                    destination.to_str().unwrap(),
+                ],
+            )
+            .unwrap();
+        }
+        w.dispatch(
+            "configure",
+            json!({"remote":remote.to_str().unwrap(),"backupPath":""}),
+        )
+        .unwrap();
+        w.dispatch("backup", json!({"slot":"2026-10-24T17:00"}))
+            .unwrap();
+        let previous = git(&remote, &["rev-parse", "refs/heads/main"]).unwrap();
+        for multiple in [false, true] {
+            git(
+                &root,
+                &[
+                    "config",
+                    "--replace-all",
+                    "remote.origin.pushurl",
+                    hidden.to_str().unwrap(),
+                ],
+            )
+            .unwrap();
+            if multiple {
+                git(
+                    &root,
+                    &[
+                        "config",
+                        "--add",
+                        "remote.origin.pushurl",
+                        remote.to_str().unwrap(),
+                    ],
+                )
+                .unwrap();
+            }
+            // Reject even if the slot/data fingerprint would otherwise skip work.
+            let error = w
+                .dispatch("scheduled_backup", json!({"slot":"2026-10-24T17:00"}))
+                .unwrap_err();
+            assert!(error.contains("push destinations differ"));
+            assert!(w.config.backup_error.contains("push destinations differ"));
+            assert_eq!(
+                git(&remote, &["rev-parse", "refs/heads/main"]).unwrap(),
+                previous
+            );
+            assert!(git(&hidden, &["rev-parse", "--verify", "refs/heads/main"]).is_err());
+            // Saving an unchanged displayed URL must still remove hidden targets.
+            w.dispatch(
+                "configure",
+                json!({"remote":remote.to_str().unwrap(),"backupPath":""}),
+            )
+            .unwrap();
+            assert_eq!(
+                git(&root, &["remote", "get-url", "--push", "--all", "origin"]).unwrap(),
+                w.remote()
+            );
+            assert!(w.config.backup_error.is_empty());
+            assert!(w.config.backup_slot.is_empty());
+            w.dispatch("scheduled_backup", json!({"slot":"2026-10-24T17:00"}))
+                .unwrap();
+            assert_eq!(w.config.backup_slot, "2026-10-24T17:00");
+        }
+        let replacement = d.path().join("replacement.git");
+        git(
+            d.path(),
+            &[
+                "init",
+                "--bare",
+                "--initial-branch=main",
+                replacement.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        w.dispatch(
+            "configure",
+            json!({"remote":replacement.to_str().unwrap(),"backupPath":""}),
+        )
+        .unwrap();
+        atomic(
+            &root.join("all-files.txt"),
+            b"Whole-workspace backups remain supported",
+        )
+        .unwrap();
+        w.dispatch("backup", json!({})).unwrap();
+        assert_eq!(
+            git(&replacement, &["show", "main:all-files.txt"]).unwrap(),
+            "Whole-workspace backups remain supported"
+        );
+        assert_eq!(
+            git(&remote, &["rev-parse", "refs/heads/main"]).unwrap(),
+            previous
+        );
+        assert!(git(&hidden, &["rev-parse", "--verify", "refs/heads/main"]).is_err());
+    }
+
+    #[test]
+    fn backup_rejects_push_rewrites_but_still_copies_all_files() {
+        let (d, mut w) = setup();
+        let root = w.root().unwrap();
+        let remote = d.path().join("expected.git");
+        let hidden = d.path().join("hidden.git");
+        for destination in [&remote, &hidden] {
+            git(
+                d.path(),
+                &[
+                    "init",
+                    "--bare",
+                    "--initial-branch=main",
+                    destination.to_str().unwrap(),
+                ],
+            )
+            .unwrap();
+        }
+        let copies = d.path().join("copies");
+        fs::create_dir(&copies).unwrap();
+        // Simulate a legacy repository with no explicit push URL, and a rewrite.
+        git(
+            &root,
+            &["remote", "add", "origin", remote.to_str().unwrap()],
+        )
+        .unwrap();
+        git(
+            &root,
+            &[
+                "config",
+                &format!("url.{}.pushInsteadOf", hidden.display()),
+                remote.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        w.config.backup_path = copies.to_string_lossy().into();
+        atomic(
+            &root.join("keep-everything.txt"),
+            b"Keep all workspace files",
+        )
+        .unwrap();
+        assert!(w
+            .dispatch("backup", json!({}))
+            .unwrap_err()
+            .contains("push destinations differ"));
+        assert_eq!(
+            fs::read(copies.join("WorkNotes-backup/keep-everything.txt")).unwrap(),
+            b"Keep all workspace files"
+        );
+        for destination in [&remote, &hidden] {
+            assert!(git(destination, &["rev-parse", "--verify", "refs/heads/main"]).is_err());
+        }
+        // Explicit push URLs take precedence over pushInsteadOf rules.
+        w.dispatch(
+            "configure",
+            json!({"remote":remote.to_str().unwrap(),"backupPath":copies.to_str().unwrap()}),
+        )
+        .unwrap();
+        w.dispatch("backup", json!({})).unwrap();
+        assert!(git(&remote, &["rev-parse", "--verify", "refs/heads/main"]).is_ok());
+        assert!(git(&hidden, &["rev-parse", "--verify", "refs/heads/main"]).is_err());
     }
 
     #[test]

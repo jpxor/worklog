@@ -8,7 +8,7 @@ use std::{
     fs,
     io::Read,
     path::{Component, Path},
-    process::{Command, Stdio},
+    process::Stdio,
     time::{Duration, Instant},
 };
 
@@ -474,7 +474,7 @@ fn git_read(root: &Path, args: &[&str], max: u64) -> Result<String> {
     if !root.join(".git").exists() {
         return Err("This workspace has no Git history".into());
     }
-    let mut command = Command::new("git");
+    let mut command = crate::storage::git_command();
     command
         .args([
             "--no-pager",
@@ -629,6 +629,7 @@ fn list_history(root: &Path, q: &Query) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     fn fixture() -> (tempfile::TempDir, Value) {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("projects/p/notes/daily/log.md");

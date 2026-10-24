@@ -4,6 +4,10 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+## 0.1.28
+
+- Disable Git hooks and external filesystem monitors during app Git operations. Block remote backups when effective push destinations differ from the URL shown in Settings; saving backup settings replaces local push URLs with the selected destination. File-copy backups still run when a remote is blocked. Whole-workspace backup coverage and workspace format 3 are unchanged; no migration is required.
+
 ## 0.1.27
 
 - Update rustls-webpki and webpki-root-certs to fix the certificate trust issues reported as RUSTSEC-2026-0382 and RUSTSEC-2026-0383.

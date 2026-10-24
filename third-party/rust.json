@@ -1,6 +1,6 @@
 {
-  "cargoLock": "9b961e78c77c4bf1ca584382e71869bdea23259e55c2ae97bbf13d61f17515b3",
-  "manifest": "08505e7f7500b8bd4da08afaf5cedbd256384fde13035abfcb980a1776f6b6a6",
+  "cargoLock": "5ef539a1f8628e8b898706dce79bb9a26c5234354b5db8a763e3a0318a931cb3",
+  "manifest": "bdac7e5e054dccbab1d94955fd62dc8bd7fa0595fb9ac1f1f0e2c1364ade0698",
   "config": "c17d4c173a099f81d1f9c08bf33fa5123ff600069197936105808c43db89125d",
   "generator": "cargo-about 0.9.2; Windows x64 MSVC and Linux x64 GNU; dev/build-only dependencies excluded",
   "packages": [
