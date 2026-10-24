@@ -160,6 +160,10 @@ The suggested export filename includes the selected inclusive range: `worklog-re
 
 ## Git history and backups
 
+Disable Git hooks and external filesystem monitors for app Git operations, including cloning and read-only history queries. Preserve all workspace files in backups under existing Git ignore rules; folder copies include the entire workspace and local Git history. Explain that secrets belong outside the workspace rather than silently excluding files.
+
+Remote backups must have exactly one effective push destination matching the Remote URL displayed in Settings. Reject hidden/multiple destinations and conflicting push rewrites before transferring data, while still attempting a configured folder copy. Saving backup settings replaces local push URLs with the chosen URL and revalidates inherited configuration. Repairing a destination mismatch makes a failed scheduled backup due again.
+
 Git tracks task metadata, Markdown notes, and the shared time ledger. Commit time records promptly and group note autosaves into commits after an idle interval rather than committing every keystroke. Serialize Git operations with data writes where needed to produce coherent snapshots.
 
 Maintain local Git history even when no remote is configured. Users can connect to an existing remote Git repository by entering its URL. The repository may be empty or already contain WorkLog data. For an empty repository, initialize local WorkLog data and push its history. For an existing WorkLog repository, clone it into a local data folder, validate its data format, and open its tasks, notes, and time records. Do not overwrite an occupied local folder or automatically combine unrelated local and remote datasets.
