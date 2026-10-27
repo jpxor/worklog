@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=WorkLog
+Comment=Project notes and time, kept local
+Exec=worklog
+Icon=worklog
+Categories=Office;
+Terminal=false
+StartupNotify=true
+StartupWMClass=local.worklog.desktop

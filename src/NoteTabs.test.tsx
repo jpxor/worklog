@@ -42,7 +42,7 @@ it("reorders tabs in both directions and ignores foreign drops", () => {
     />,
   );
   const dataTransfer = {
-    types: ["application/x-worknotes-tab"],
+    types: ["application/x-worklog-tab"],
     getData: () => "a.md",
   };
   fireEvent.drop(screen.getByRole("button", { name: "b.md" }).parentElement!, {

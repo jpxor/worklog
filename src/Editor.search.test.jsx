@@ -28,7 +28,7 @@ it.each([false, true])(
           onCursor={() => {}}
         />,
       );
-      act(() => window.dispatchEvent(new Event("worknotes:find")));
+      act(() => window.dispatchEvent(new Event("worklog:find")));
       const panel = container.querySelector(".cm-search");
       const controls = within(panel);
       for (const name of ["match case", "regexp", "by word"]) {

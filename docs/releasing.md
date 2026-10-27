@@ -18,9 +18,9 @@ Update all version locations in the same PR:
 | `package-lock.json` | top-level `version` and `packages[""].version` |
 | `src-tauri/tauri.conf.json` | `version` |
 | `src-tauri/Cargo.toml` | `[package].version` |
-| `src-tauri/Cargo.lock` | the `worknotes` package's version |
+| `src-tauri/Cargo.lock` | the `worklog` package's version |
 
-`npm version X.Y.Z --no-git-tag-version` updates the npm files without creating a release tag. Edit the Tauri and Cargo manifests, then run `cargo check --manifest-path src-tauri/Cargo.toml` to refresh the Cargo lockfile's application version. Review lockfile diffs; avoid unrelated dependency upgrades. Do not rename internal `worknotes` identifiers when bumping a version.
+`npm version X.Y.Z --no-git-tag-version` updates the npm files without creating a release tag. Edit the Tauri and Cargo manifests, then run `cargo check --manifest-path src-tauri/Cargo.toml` to refresh the Cargo lockfile's application version. Review lockfile diffs; avoid unrelated dependency upgrades. Do not rename internal `worklog` identifiers when bumping a version.
 
 In [release-notes.md](release-notes.md), move completed Unreleased bullets into a new `## X.Y.Z` section immediately below `## Unreleased`; keep Unreleased for later work. Describe user-visible additions/fixes, data compatibility or migration requirements, known limitations, and tested platforms. Keep historical sections intact. The exact version heading and at least one `- ` bullet are required. Update shared download guidance below `<!-- release-downloads -->` when packaging or installation changes; keep that marker exactly once.
 
@@ -48,6 +48,8 @@ npm run release:check -- --tag vX.Y.Z --output ../worklog-release-preview.md
 Review the generated text, release PR diff, and Windows/Linux CI checks. Confirm there are no unintended generated files or private data. Verify required license/notice resources are present in every intended distribution; the first full dependency audit and binary notice packaging are still tracked in the publication checklist. Verify the version is unused in remote tags and GitHub Releases (including drafts); GitHub CLI users can run `gh release list --repo jpxor/worklog`.
 
 Download CI artifacts and smoke-test on clean Windows and Ubuntu 22.04 installations or VMs. Record versions, package names, results, and exceptions in the release PR:
+
+Also test Ubuntu 24.04 GNOME on Wayland: install the same DEB, launch from Applications, pin it to the dock, close and relaunch, then upgrade from the previous release. Confirm one visible WorkLog launcher and the correct icon. CI checks installation/reinstallation/removal and linked libraries in a 24.04 container; it does not test the graphical session. The DEB includes an application-ID launcher (`local.worklog.desktop.desktop`) for GTK association and a hidden legacy `WorkLog.desktop` entry to avoid duplicate menu items. Keep the application identifier, launcher filename and StartupWMClass aligned.
 
 - Install, launch, close, and reopen; confirm version and upgrade behavior. Windows is unsigned; report signing limitations accurately.
 - In a synthetic format-3 workspace, create a task/code/global note, save and reopen notes and time, correct an entry, and export a report.
@@ -80,7 +82,7 @@ Replace `<reviewed-main-commit-sha>` with the exact commit whose successful `mai
 Check the Actions run and [Releases](https://github.com/jpxor/worklog/releases). Verify the tag points to the reviewed commit and the body contains only that version's changes plus download guidance. Expected assets:
 
 - Windows NSIS installer and `WorkLog-windows-x64.zip`.
-- Linux `.deb`, `.AppImage`, and `WorkLog-linux-x64.tar.gz` containing `worknotes`.
+- Linux `.deb` and `WorkLog-linux-x64.tar.gz` containing `worklog`. AppImage is withheld pending native-library licensing review.
 - `SHA256SUMS.txt`, covering all other release files.
 - `LICENSE.txt`, `THIRD-PARTY-NOTICES.txt`, and `WorkLog-third-party.tar.gz`. Portable archives include the license, notices, full inventory and corresponding source; installers include the same materials under `licenses/` relative to Tauri's resource directory. See [third-party materials](third-party.md).
 

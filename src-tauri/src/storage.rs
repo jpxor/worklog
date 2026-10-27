@@ -58,7 +58,7 @@ fn hash_data(root: &Path, current: &Path, hash: &mut DefaultHasher) -> Result<()
     for entry in entries {
         let path = entry.path();
         if current == root
-            && (entry.file_name() == ".git" || entry.file_name() == ".worknotes.lock")
+            && (entry.file_name() == ".git" || entry.file_name() == ".worklog.lock")
         {
             continue;
         }
@@ -403,7 +403,7 @@ fn copy_tree(source: &Path, dest: &Path) -> Result<()> {
     for item in fs::read_dir(source).map_err(err)? {
         let item = item.map_err(err)?;
         let name = item.file_name();
-        if name == ".worknotes.lock" {
+        if name == ".worklog.lock" {
             continue;
         }
         let kind = item.file_type().map_err(err)?;
@@ -532,7 +532,7 @@ impl Workspace {
                         "-c",
                         "user.name=WorkLog",
                         "-c",
-                        "user.email=worknotes@local.invalid",
+                        "user.email=worklog@local.invalid",
                         "commit",
                         "-m",
                         "Save WorkLog changes",
@@ -556,12 +556,12 @@ impl Workspace {
         if self.config.root == root.to_string_lossy() && self.lock.is_some() {
             return Ok(());
         }
-        let marker = root.join("worknotes.json");
+        let marker = root.join("worklog.json");
         if !marker.exists() {
             if fs::read_dir(&root).map_err(err)?.next().is_some() {
                 return Err("Folder is not empty and does not contain WorkLog data".into());
             }
-            atomic(&marker, b"{\"format\":\"worknotes\",\"version\":3}\n")?;
+            atomic(&marker, b"{\"format\":\"worklog\",\"version\":3}\n")?;
             fs::create_dir(root.join("projects")).map_err(err)?;
             atomic(&root.join("projects/.gitkeep"), b"")?;
             atomic(&root.join("project-codes.json"), b"[]\n")?;
@@ -569,11 +569,11 @@ impl Workspace {
             atomic(&root.join("time.jsonl"), b"")?;
             atomic(
                 &root.join(".gitignore"),
-                b".worknotes.lock\n.worknotes-tmp*\n",
+                b".worklog.lock\n.worklog-tmp*\n",
             )?;
         }
         let format = read_json(&marker)?;
-        if format["format"] != "worknotes" || format["version"] != 3 {
+        if format["format"] != "worklog" || format["version"] != 3 {
             return Err("Unsupported WorkLog data format".into());
         }
         let lock = OpenOptions::new()
@@ -581,7 +581,7 @@ impl Workspace {
             .truncate(false)
             .read(true)
             .write(true)
-            .open(root.join(".worknotes.lock"))
+            .open(root.join(".worklog.lock"))
             .map_err(err)?;
         lock.try_lock_exclusive()
             .map_err(|_| "This data folder is open in another WorkLog instance")?;
@@ -658,8 +658,8 @@ impl Workspace {
                     .map_err(|e| format!("Ledger line {}: {e}. Data preserved.", n + 1))?,
             );
         }
-        let format = read_json(&root.join("worknotes.json"))?;
-        if format["format"] != "worknotes" {
+        let format = read_json(&root.join("worklog.json"))?;
+        if format["format"] != "worklog" {
             return Err("Invalid WorkLog format".into());
         }
         if format["version"] != 3 {
@@ -1056,7 +1056,7 @@ impl Workspace {
                         folder.to_str().ok_or("Invalid path")?,
                     ],
                 )?;
-                if !folder.join("worknotes.json").exists() {
+                if !folder.join("worklog.json").exists() {
                     let entries = fs::read_dir(&folder)
                         .map_err(err)?
                         .filter_map(|e| e.ok())
@@ -1066,15 +1066,15 @@ impl Workspace {
                         return Err("Repository contains non-WorkLog data".into());
                     }
                     atomic(
-                        &folder.join("worknotes.json"),
-                        b"{\"format\":\"worknotes\",\"version\":3}\n",
+                        &folder.join("worklog.json"),
+                        b"{\"format\":\"worklog\",\"version\":3}\n",
                     )?;
                     fs::create_dir(folder.join("projects")).map_err(err)?;
                     atomic(&folder.join("projects/.gitkeep"), b"")?;
                     atomic(&folder.join("project-codes.json"), b"[]\n")?;
                     atomic(&folder.join("global/notes/.gitkeep"), b"")?;
                     atomic(&folder.join("time.jsonl"), b"")?;
-                    atomic(&folder.join(".gitignore"), b".worknotes.lock\n")?;
+                    atomic(&folder.join(".gitignore"), b".worklog.lock\n")?;
                 }
                 if dest.exists() {
                     fs::remove_dir(&dest).map_err(err)?;
@@ -1171,11 +1171,11 @@ impl Workspace {
         }
         let parent = p.canonicalize().map_err(err)?;
         let root = self.root()?.canonicalize().map_err(err)?;
-        let dest = parent.join("WorkNotes-backup");
+        let dest = parent.join("WorkLog-backup");
         if dest.starts_with(&root) || root.starts_with(&dest) {
             return Err("Backup must be outside the working data folder".into());
         }
-        if dest.exists() && !dest.join("worknotes.json").is_file() {
+        if dest.exists() && !dest.join("worklog.json").is_file() {
             return Err("Existing backup destination is not WorkLog data".into());
         }
         if dest.exists()
@@ -1194,9 +1194,9 @@ impl Workspace {
         let stage = tempfile::tempdir_in(parent).map_err(err)?;
         let next = stage.path().join("next");
         copy_tree(&self.root()?, &next)?;
-        let old = parent.join("WorkNotes-backup.previous");
+        let old = parent.join("WorkLog-backup.previous");
         if old.exists() {
-            return Err("A previous interrupted backup exists. Check WorkNotes-backup.previous before retrying.".into());
+            return Err("A previous interrupted backup exists. Check WorkLog-backup.previous before retrying.".into());
         }
         let had = dest.exists();
         if had {
@@ -1292,7 +1292,7 @@ mod tests {
             checked
         );
         assert_eq!(
-            read_json(&w.root().unwrap().join("worknotes.json")).unwrap()["version"],
+            read_json(&w.root().unwrap().join("worklog.json")).unwrap()["version"],
             3
         );
     }
@@ -1395,13 +1395,13 @@ mod tests {
         assert_eq!(first["backupSlot"], "2026-10-17T17:00");
         assert!(!first["lastBackup"].as_str().unwrap().is_empty());
         let saved = w.config.last_backup.clone();
-        fs::remove_dir_all(parent.join("WorkNotes-backup")).unwrap();
+        fs::remove_dir_all(parent.join("WorkLog-backup")).unwrap();
         w.dispatch("commit", json!({})).unwrap();
-        assert!(!parent.join("WorkNotes-backup").exists());
+        assert!(!parent.join("WorkLog-backup").exists());
         w.dispatch("scheduled_backup", json!({"slot":"2026-10-18T17:00"}))
             .unwrap();
         assert_eq!(w.config.last_backup, saved);
-        assert!(!parent.join("WorkNotes-backup").exists());
+        assert!(!parent.join("WorkLog-backup").exists());
         let persisted: Config =
             serde_json::from_value(read_json(&w.config_dir.join("settings.json")).unwrap())
                 .unwrap();
@@ -1413,10 +1413,10 @@ mod tests {
         .unwrap();
         w.dispatch("scheduled_backup", json!({"slot":"2026-10-18T17:00"}))
             .unwrap();
-        assert!(!parent.join("WorkNotes-backup").exists());
+        assert!(!parent.join("WorkLog-backup").exists());
         w.dispatch("backup", json!({"slot":"2026-10-18T17:00"}))
             .unwrap();
-        assert!(parent.join("WorkNotes-backup").exists());
+        assert!(parent.join("WorkLog-backup").exists());
         let previous_fingerprint = w.config.backup_fingerprint.clone();
         w.dispatch(
             "create_project",
@@ -1452,7 +1452,7 @@ mod tests {
             .unwrap();
         assert_eq!(restored["backupError"], "");
         assert_eq!(restored["backupSlot"], "2026-10-17T17:00");
-        assert!(parent.join("WorkNotes-backup").is_dir());
+        assert!(parent.join("WorkLog-backup").is_dir());
         assert!(w
             .dispatch(
                 "configure",
@@ -1629,7 +1629,7 @@ mod tests {
             .unwrap();
         let id = snapshot["projects"][0]["id"].as_str().unwrap();
         let root = format!("projects/{id}/notes");
-        let name = format!("worknotes-recycle-test-{}.txt", uuid::Uuid::new_v4());
+        let name = format!("worklog-recycle-test-{}.txt", uuid::Uuid::new_v4());
         let relative = format!("{root}/{name}");
         w.dispatch("create_note", json!({"path":relative})).unwrap();
         w.dispatch(
@@ -1651,7 +1651,7 @@ mod tests {
             fs::read_to_string(w.safe(&relative).unwrap()).unwrap(),
             "Recycle round-trip bytes"
         );
-        let folder_name = format!("worknotes-empty-recycle-test-{}", uuid::Uuid::new_v4());
+        let folder_name = format!("worklog-empty-recycle-test-{}", uuid::Uuid::new_v4());
         let folder = format!("{root}/{folder_name}");
         w.dispatch("create_folder", json!({"path":format!("{folder}/nested")}))
             .unwrap();
@@ -1678,8 +1678,8 @@ mod tests {
         fs::create_dir(&backup).unwrap();
         w.config.backup_path = backup.to_string_lossy().into();
         w.copy_backup().unwrap();
-        let saved = backup.join("WorkNotes-backup");
-        assert!(saved.join("worknotes.json").is_file());
+        let saved = backup.join("WorkLog-backup");
+        assert!(saved.join("worklog.json").is_file());
         assert!(saved.join(".git").is_dir());
         w.copy_backup().unwrap();
         let mut restored = Workspace {
@@ -1953,7 +1953,7 @@ mod tests {
             .unwrap_err()
             .contains("push destinations differ"));
         assert_eq!(
-            fs::read(copies.join("WorkNotes-backup/keep-everything.txt")).unwrap(),
+            fs::read(copies.join("WorkLog-backup/keep-everything.txt")).unwrap(),
             b"Keep all workspace files"
         );
         for destination in [&remote, &hidden] {
@@ -2082,13 +2082,13 @@ mod tests {
         };
         for version in [1, 2, 4] {
             let marker =
-                serde_json::to_vec(&json!({"format":"worknotes","version":version})).unwrap();
-            atomic(&root.join("worknotes.json"), &marker).unwrap();
+                serde_json::to_vec(&json!({"format":"worklog","version":version})).unwrap();
+            atomic(&root.join("worklog.json"), &marker).unwrap();
             assert_eq!(
                 reopened.open(root.to_str().unwrap()).unwrap_err(),
                 "Unsupported WorkLog data format"
             );
-            assert_eq!(fs::read(root.join("worknotes.json")).unwrap(), marker);
+            assert_eq!(fs::read(root.join("worklog.json")).unwrap(), marker);
             assert_eq!(fs::read(root.join("project-codes.json")).unwrap(), codes);
             assert_eq!(fs::read(root.join("time.jsonl")).unwrap(), time);
             assert!(root.join("global/notes/.gitkeep").is_file());

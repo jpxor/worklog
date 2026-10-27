@@ -19,13 +19,14 @@ vi.mock("./api", () => ({
   confirmAction: vi.fn(),
 }));
 import App from "./App";
-import { exportFile } from "./api";
+import { directory, exportFile } from "./api";
 import { emptySnapshot, today, reportRange, type Snapshot } from "./model";
 const path = "projects/p/notes/log.md";
 let data: Snapshot;
 let file: string;
 beforeEach(() => {
   localStorage.clear();
+  vi.mocked(directory).mockReset().mockResolvedValue(null);
   // jsdom has no layout; real coordinate/scroll checks run in the browser.
   Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
   Range.prototype.getBoundingClientRect = () => new DOMRect();
@@ -68,6 +69,50 @@ beforeEach(() => {
     );
 });
 afterEach(cleanup);
+it("routes workspace actions to folder selection without opening creation forms when cancelled", async () => {
+  data = { ...emptySnapshot };
+  render(<App />);
+  await screen.findByRole("heading", { name: "Choose a workspace to begin" });
+  await waitFor(() => expect(screen.getByText("Choose a workspace to begin", { selector: ".statusbar span" })).toBeTruthy());
+  expect(screen.queryByRole("combobox", { name: "Task" })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Duration" })).toBeNull();
+  const actions = [
+    screen.getByTitle("Create task"),
+    screen.getByRole("button", { name: "Create a note" }),
+    screen.getByTitle(/^New note/),
+    screen.getByRole("button", { name: /Jump to anything/ }),
+    screen.getByRole("button", { name: "Search notes" }),
+    screen.getByRole("button", { name: "Reports" }),
+    screen.getByRole("button", { name: "Log time" }),
+  ];
+  for (const [index, button] of actions.entries()) {
+    fireEvent.click(button);
+    await waitFor(() => expect(directory).toHaveBeenCalledTimes(index + 1));
+    await act(async () => {});
+  }
+  fireEvent.keyDown(window, { key: "n", ctrlKey: true });
+  await waitFor(() => expect(directory).toHaveBeenCalledTimes(actions.length + 1));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(mocks.request.mock.calls.map(([action]) => action)).toEqual(["load"]);
+});
+
+it("enables normal task creation after a workspace is selected", async () => {
+  const opened = { ...data, projects: [], notes: [] };
+  data = { ...emptySnapshot };
+  vi.mocked(directory).mockResolvedValue("/chosen-workspace");
+  mocks.request.mockImplementation(async (action) => action === "open_workspace" ? opened : data);
+  render(<App />);
+  fireEvent.click(await screen.findByRole("button", { name: "Choose a data folder" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("open_workspace", { path: "/chosen-workspace" }));
+  await screen.findByRole("dialog", { name: "Create a task tutorial" });
+  const taskInput = screen.getAllByRole("combobox", { name: "Task" })[0];
+  fireEvent.focus(taskInput);
+  fireEvent.change(taskInput, { target: { value: "First task" } });
+  fireEvent.keyDown(taskInput, { key: "Enter" });
+  expect(await screen.findByRole("dialog", { name: "Create task" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Choose a workspace to begin" })).toBeNull();
+});
+
 async function openOverview() {
   await waitFor(() =>
     expect(
@@ -205,7 +250,7 @@ it("waits for a checkbox save before opening its source from the tree", async ()
 
 it("refreshes an empty legacy time draft to local today and preserves an explicit historical date", async () => {
   localStorage.setItem(
-    "worknotes.draft.v3:test-workspace",
+    "worklog.draft.v3:test-workspace",
     JSON.stringify({ date: "2026-01-01", project: "p", time: "", note: "" }),
   );
   const { container, unmount } = render(<App />);
@@ -394,7 +439,7 @@ it("applies timesheet presets and switches report grouping", async () => {
   );
   fireEvent.click(within(dialog).getByRole("button", { name: "Day" }));
   expect(dialog.querySelector(".report-preview")?.textContent).toContain("## " + today() + " [0h 45m]");
-  expect(localStorage.getItem("worknotes.reportGrouping")).toBe('"day"');
+  expect(localStorage.getItem("worklog.reportGrouping")).toBe('"day"');
   fireEvent.click(within(dialog).getByRole("button", { name: "Task" }));
   expect(dialog.querySelector(".report-preview")?.textContent).toContain("## One [0h 45m]");
   expect((within(dialog).getByLabelText("From") as HTMLInputElement).value).toBe(today());
@@ -421,7 +466,7 @@ it("applies timesheet presets and switches report grouping", async () => {
 });
 
 it("restores the saved report grouping", async () => {
-  localStorage.setItem("worknotes.reportGrouping", '"day"');
+  localStorage.setItem("worklog.reportGrouping", '"day"');
   render(<App />);
   await openOverview();
   fireEvent.click(screen.getByRole("button", { name: "Reports" }));
@@ -456,7 +501,7 @@ it("pages content-search results without hiding the number of remaining notes", 
 
 it("shows only the global and task roots in order, with global notes initially collapsed", async () => {
   data.notes.push({ path: "global/notes/shared.md", content: "Shared reference" });
-  localStorage.setItem("worknotes.tree:test-workspace:global/notes", "[]");
+  localStorage.setItem("worklog.tree:test-workspace:global/notes", "[]");
   const { container, unmount } = render(<App />);
   await openOverview();
   const roots = container.querySelectorAll(".tree-root-row .tree-root");
@@ -535,5 +580,5 @@ it("shows Use today only for another date and preserves the time draft when rese
   expect((duration as HTMLInputElement).value).toBe("45m");
   expect(form.queryByRole("button", { name: "Use today" })).toBeNull();
   expect(form.queryByText(/local time/i)).toBeNull();
-  expect(JSON.parse(localStorage.getItem("worknotes.draft.v3:test-workspace")!).dateMode).toBe("today");
+  expect(JSON.parse(localStorage.getItem("worklog.draft.v3:test-workspace")!).dateMode).toBe("today");
 });

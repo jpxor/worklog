@@ -44,13 +44,13 @@ export default function ContextMenu({
       }
     };
     window.addEventListener("click", close);
-    window.addEventListener("worknotes:close-context-menus", close);
+    window.addEventListener("worklog:close-context-menus", close);
     window.addEventListener("keydown", key);
     window.addEventListener("resize", close);
     window.addEventListener("scroll", scroll, true);
     return () => {
       window.removeEventListener("click", close);
-      window.removeEventListener("worknotes:close-context-menus", close);
+      window.removeEventListener("worklog:close-context-menus", close);
       window.removeEventListener("keydown", key);
       window.removeEventListener("resize", close);
       window.removeEventListener("scroll", scroll, true);

@@ -71,7 +71,7 @@ The detailed layout, control states, keyboard behavior, and drag-and-drop intera
 
 ## 1. Define and validate the data
 
-- Add a `ProjectCode` collection with stable IDs, labels, and archived status. Store it in workspace-level `project-codes.json`, included in snapshots and backups. Use `worknotes.json` format version 3 for this complete change.
+- Add a `ProjectCode` collection with stable IDs, labels, and archived status. Store it in workspace-level `project-codes.json`, included in snapshots and backups. Use `worklog.json` format version 3 for this complete change.
 - Add `defaultProjectCodeId` to task metadata and required `projectCodeId` to each saved time entry.
 - Add a workspace-level `global/notes/` directory. Give notes an explicit task/global ownership scope in frontend and retrieval metadata; global notes do not use a fake task ID.
 - Keep task IDs, entry IDs, note paths, and the current directory layout. Internal `projectId` fields can continue identifying tasks; changing terminology should not require moving notes or rewriting their links.
