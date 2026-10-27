@@ -2,7 +2,7 @@
 
 A local work logbook for task notes, tests, outcomes, and time tracking. Built with Tauri 2, React, TypeScript, and CodeMirror 6. The product requirements are in [SPEC.md](../SPEC.md).
 
-WorkLog was previously named WorkNotes. The application identity and backup destination names are retained; this build requires workspace format 3. The internal application identifier, storage keys, `worknotes.json` data marker, and `WorkNotes-backup` directory keep their original names so the rename does not create a separate workspace or backup. The internal executable/package name remains `worknotes`.
+The executable is named `worklog` (`worklog.exe` on Windows), and the Debian package is `work-log`. The application identifier is `local.worklog.desktop`, the workspace marker is `worklog.json`, and folder backups use `WorkLog-backup`.
 
 ## Development
 
@@ -38,6 +38,10 @@ Time remains plaintext in `time.jsonl`, with one current JSON entry per line. Ed
 ## Workspace format
 
 WorkLog opens format 3 only. New workspaces include empty project-code storage and a global-notes root. Opening, cloning, and restoring reject unsupported formats without changing their data. No workspace upgrade command is included.
+
+The full product rename changes the application data directory, UI preference keys, workspace marker, lock filename, and backup directory. Settings and UI preferences from earlier builds are not imported. Reconfigure backups, reminders, and MCP as needed. Folder backups now go to `WorkLog-backup`; earlier backup folders are retained separately.
+
+To use an existing version-3 workspace from before this rename, close every app instance and back up the folder. Rename its root JSON marker to `worklog.json` and set its `format` field to `"worklog"`, keeping `version` at `3`. The marker should contain `{"format":"worklog","version":3}`. Add `.worklog.lock` and `.worklog-tmp*` to the workspace's `.gitignore`. Then choose that folder in WorkLog. Apply the same marker update to a restored copy of an earlier backup. Notes, attachments, project codes, and `time.jsonl` need no changes. Do not open the folder concurrently with an earlier build.
 
 ## Tasks, project codes, and Global notes
 
@@ -80,9 +84,9 @@ Git backups require exactly one effective push destination matching the Remote U
 
 Whole-workspace backup coverage is intentional. All workspace files are eligible for Git history under its existing ignore rules, and file-copy backups include the entire folder and Git history. Keep passwords, private keys, and other secrets outside the workspace. There is no automatic secret scanner or file filtering; deleted files may remain in history and older backups.
 
-Alternatively choose a backup parent folder, including a mounted network location. Back up now writes `WorkNotes-backup` inside it, including Git history. It stages the new copy before replacing the old backup. It retains one completed snapshot. If replacement is interrupted, inspect the `.previous` directory before retrying. Keep this destination outside the working data folder.
+Alternatively choose a backup parent folder, including a mounted network location. Back up now writes `WorkLog-backup` inside it, including Git history. It stages the new copy before replacing the old backup. It retains one completed snapshot. If replacement is interrupted, inspect the `.previous` directory before retrying. Keep this destination outside the working data folder.
 
-Restore a remote backup by cloning it through Settings. Restore a file backup by copying `WorkNotes-backup` to a local directory and choosing that folder. The app validates its format and ledger on opening.
+Restore a remote backup by cloning it through Settings. Restore a file backup by copying `WorkLog-backup` to a local directory and choosing that folder. The app validates its format and ledger on opening.
 
 Deletion asks for confirmation and moves files or empty folders to the OS Recycle Bin/Trash. Recover them using the OS file manager. If recycling fails, WorkLog asks separately before permanent deletion. New deletions create no private `.trash` copies. Legacy `.trash` folders from earlier versions are left for the user to manage; Git and older backups may already retain previous versions.
 

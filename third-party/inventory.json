@@ -1,8 +1,8 @@
 {
   "lockHashes": {
-    "package-lock.json": "9f7ee9bdb468dc44143fa1a9abb09656b071db7c9ef0db086f5deb7b3fdab801",
-    "src-tauri/Cargo.lock": "5ef539a1f8628e8b898706dce79bb9a26c5234354b5db8a763e3a0318a931cb3",
-    "src-tauri/Cargo.toml": "bdac7e5e054dccbab1d94955fd62dc8bd7fa0595fb9ac1f1f0e2c1364ade0698",
+    "package-lock.json": "5375658f69ac3b2f87267eb2a9d067537bf0a555409133daaa436950ee90d210",
+    "src-tauri/Cargo.lock": "ea2115eba8623e252b3f1d2165ce569c020347014300154d2512a7a5f67dad99",
+    "src-tauri/Cargo.toml": "2e55ba9039a7635f1f1eb90e1f25482bcaa534d338a511743c52a57490cb1e2b",
     "src-tauri/about.toml": "c17d4c173a099f81d1f9c08bf33fa5123ff600069197936105808c43db89125d"
   },
   "npmScope": "Locked non-dev, non-optional npm dependency superset. Some packages are tree-shaken. Optional Node canvas/native dependencies are not used by the browser application.",

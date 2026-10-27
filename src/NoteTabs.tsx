@@ -6,7 +6,7 @@ import type { Project } from "./model";
 import ContextMenu from "./ContextMenu";
 import { reorderTabs } from "./notePaths";
 import FileIcon from "./FileIcon";
-const tabType = "application/x-worknotes-tab";
+const tabType = "application/x-worklog-tab";
 export default function NoteTabs({
   tabs,
   active,
@@ -73,7 +73,7 @@ export default function NoteTabs({
           }}
           onContextMenu={(event) => {
             event.preventDefault();
-            window.dispatchEvent(new Event("worknotes:close-context-menus"));
+            window.dispatchEvent(new Event("worklog:close-context-menus"));
             event.currentTarget.querySelector("button")?.focus();
             const rect = event.currentTarget.getBoundingClientRect();
             setMenu({

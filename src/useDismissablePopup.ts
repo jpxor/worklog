@@ -18,11 +18,11 @@ export function useDismissablePopup(open: boolean, onClose: () => void) {
     const dismiss = () => close.current();
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("keydown", key);
-    window.addEventListener("worknotes:close-context-menus", dismiss);
+    window.addEventListener("worklog:close-context-menus", dismiss);
     return () => {
       document.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("keydown", key);
-      window.removeEventListener("worknotes:close-context-menus", dismiss);
+      window.removeEventListener("worklog:close-context-menus", dismiss);
     };
   }, [open]);
   return host;

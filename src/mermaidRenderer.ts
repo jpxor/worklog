@@ -34,7 +34,7 @@ export function renderMermaid(
         ],
       });
       const { svg } = await mermaid.render(
-        `worknotes-mermaid-${++sequence}`,
+        `worklog-mermaid-${++sequence}`,
         source,
       );
       return active() ? svg : null;

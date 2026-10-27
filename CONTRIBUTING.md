@@ -16,7 +16,7 @@ Search existing issues first. For bugs, include the WorkLog version, OS, package
 
 - Keep changes focused and follow the surrounding TypeScript, React, and Rust conventions. Prefer explicit types at boundaries and small, readable functions. Avoid unrelated formatting or generated-file changes.
 - Add regression coverage for changed behavior, especially path validation, deletion, stale writes, backup/restore, rendering, and MCP authentication. Use temporary directories and synthetic data in tests; never depend on a contributor's real workspace or credentials.
-- Preserve workspace format 3 and existing `worknotes` identifiers. Discuss migrations before implementing them. Treat data loss, backup fidelity, and security boundaries as review priorities.
+- Preserve workspace format 3 and existing `worklog` identifiers. Discuss migrations before implementing them. Treat data loss, backup fidelity, and security boundaries as review priorities.
 - Update user documentation for behavior changes. Add a user-facing bullet to `## Unreleased` in [release notes](docs/release-notes.md), including compatibility/data impact where relevant. Internal refactors need a note only if users or contributors are affected.
 - Commit `package-lock.json` and `src-tauri/Cargo.lock` with dependency changes. Explain why a new dependency is needed and review its license, upstream notices, bundle impact, and maintenance status. Preserve attribution for copied code and assets.
 - Keep workspace access in Rust behind validated Tauri commands. Do not enable filesystem or network access in the browser preview or weaken authentication, TLS defaults, or the content security policy to work around a bug.

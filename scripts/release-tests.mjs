@@ -38,7 +38,7 @@ test("rejects missing, empty, or duplicate version sections and missing download
 });
 
 test("reads the application package rather than dependency versions in Cargo metadata", () => {
-  assert.equal(packageVersion('[package]\nname = "worknotes"\nversion = "0.1.26"\n\n[dependencies]\nversion = "9"'), "0.1.26");
-  assert.equal(packageVersion('version = 4\n\n[[package]]\nname = "other"\nversion = "9.0.0"\n\n[[package]]\nname = "worknotes"\nversion = "0.1.26"\n', "worknotes"), "0.1.26");
+  assert.equal(packageVersion('[package]\nname = "worklog"\nversion = "0.1.26"\n\n[dependencies]\nversion = "9"'), "0.1.26");
+  assert.equal(packageVersion('version = 4\n\n[[package]]\nname = "other"\nversion = "9.0.0"\n\n[[package]]\nname = "worklog"\nversion = "0.1.26"\n', "worklog"), "0.1.26");
   assert.throws(() => packageVersion('[package]\nname = "missing"'), /Cannot find/);
 });

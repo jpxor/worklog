@@ -4,6 +4,15 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+## 0.2.0
+
+- Show a workspace-first welcome state. Task/note creation, search, reports, time logging, and their shortcuts open folder selection until a workspace is open; cancelling leaves the welcome state intact.
+- Rename the executable/package to `worklog` and use WorkLog consistently for app identity, settings keys, workspace markers, locks, backups, packaging, and documentation. Earlier app settings and UI preferences are not imported. Existing version-3 workspaces require a manual marker update; see the user guide. Notes and time records are unchanged.
+- Associate Linux windows with the installed WorkLog launcher and icon on GNOME/Wayland. Use the DEB for desktop integration.
+- Add Ubuntu 24.04 installation, reinstallation, runtime dependency and removal checks for the same package built on Ubuntu 22.04. Graphical launch and dock behavior still need desktop smoke testing.
+- Since the last published release (0.1.27): disable Git hooks and external filesystem monitors during app Git operations. Block remote backups when effective push destinations differ from the configured URL; saving backup settings repairs local push URLs. File-copy backups continue when remote backup is blocked.
+- Upgrade note: this release does not import earlier settings or UI preferences. Back up existing workspaces and update their root marker to `worklog.json` with `{"format":"worklog","version":3}` before opening; see the user guide. Do not run earlier builds against the same folder concurrently.
+
 ## 0.1.28
 
 - Disable Git hooks and external filesystem monitors during app Git operations. Block remote backups when effective push destinations differ from the URL shown in Settings; saving backup settings replaces local push URLs with the selected destination. File-copy backups still run when a remote is blocked. Whole-workspace backup coverage and workspace format 3 are unchanged; no migration is required.
@@ -74,7 +83,7 @@ Task notes and time tracking in a local desktop app.
 | --- | --- | --- |
 | Windows x64 | `*_x64-setup.exe` | Installer; recommended for Windows. |
 | Windows x64 | `WorkLog-windows-x64.zip` | Portable archive with executable, licenses and corresponding source; requires WebView2. |
-| Linux x86-64 | `*.deb` | Debian/Ubuntu package, built on Ubuntu 22.04. |
+| Linux x86-64 | `*.deb` | Recommended Ubuntu installer, built on Ubuntu 22.04; install or upgrade with `sudo apt install ./FILENAME.deb`. |
 | Linux x86-64 | `WorkLog-linux-x64.tar.gz` | Standalone executable; requires GTK 3 and WebKitGTK 4.1 runtime libraries. |
 | All | `SHA256SUMS.txt` | SHA-256 checksums for the files above. |
 

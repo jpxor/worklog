@@ -52,6 +52,20 @@ Download the Windows installer or Linux DEB from the [latest release](https://gi
 
 The [user guide](docs/user-guide.md) covers shortcuts, attachments, time corrections, history, backups, and workspace recovery.
 
+### Install and update on Ubuntu
+
+Use the same x86-64 DEB on Ubuntu 22.04 and 24.04; a separate build per Ubuntu version is not required. Close WorkLog, download the `.deb` from the [latest release](https://github.com/jpxor/worklog/releases/latest), then run from its download directory (replace the filename):
+
+```sh
+sudo apt install ./WorkLog_VERSION_amd64.deb
+```
+
+APT installs dependencies, puts the executable at `/usr/bin/worklog`, and registers WorkLog in Applications with its icon. Install a newer DEB with the same command to upgrade. Updates require downloading the newer DEB; WorkLog does not configure an APT repository.
+
+Launch the installed WorkLog from Applications and replace any dock shortcut pointing to a standalone executable. Workspaces from builds before the full rename require the one-time marker update described in the [user guide](docs/user-guide.md#workspace-format).
+
+To uninstall the app, run `sudo apt remove work-log`. Your workspace folders are retained.
+
 ## Your data and backups
 
 Format 3 adds `project-codes.json` and `global/notes/`, included in history and backups. Task paths and internal `projectId` references are retained. Only version-3 workspaces are supported; see [workspace format](docs/user-guide.md#workspace-format).
@@ -126,10 +140,3 @@ Original WorkLog code, documentation, and original assets are licensed under [Ap
 - [LLM connection guide](docs/mcp.md) — MCP setup, authentication, tools, and retrieval examples.
 - [Product specification](SPEC.md) — requirements and implementation context.
 - [Task review design](docs/project-review.md) — review evidence, current capabilities, and proposed workflows.
-
-<details>
-<summary>Compatibility with earlier WorkNotes versions</summary>
-
-WorkLog was previously named WorkNotes. The application identity and backup destination names are retained; this build requires workspace format 3. Internal package/executable names, application identifiers, storage keys, the `worknotes.json` marker, and the `WorkNotes-backup` folder retain their original names to preserve existing workspaces.
-
-</details>

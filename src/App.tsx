@@ -251,15 +251,15 @@ const preview: Snapshot = {
 
 export default function App() {
   const [bindings, setBindings] = useState<Bindings>(() =>
-    loadBindings(stored("worknotes.shortcuts", null)),
+    loadBindings(stored("worklog.shortcuts", null)),
   );
   const [helpMenu, setHelpMenu] = useState(false);
   useEffect(() => {
-    localStorage.setItem("worknotes.shortcuts", JSON.stringify(bindings));
+    localStorage.setItem("worklog.shortcuts", JSON.stringify(bindings));
   }, [bindings]);
   const { ask, view: promptView } = useTextPrompt();
   const [theme, setTheme] = useState<"system" | "light" | "dark">(() =>
-    stored("worknotes.theme", "system"),
+    stored("worklog.theme", "system"),
   );
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
@@ -273,7 +273,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("worknotes.theme", JSON.stringify(theme));
+    localStorage.setItem("worklog.theme", JSON.stringify(theme));
   }, [theme, dark]);
   const [data, setData] = useState<Snapshot>(desktop ? emptySnapshot : preview);
   const dataRef = useRef(data);
@@ -281,7 +281,7 @@ export default function App() {
   const [ws, setWs] = useState<Workspace>(() => initialWorkspace);
   const [draft, setDraft] = useState<Draft>(() =>
     (() => {
-      const saved = stored<Draft>("worknotes.draft.v3", {
+      const saved = stored<Draft>("worklog.draft.v3", {
         date: today(),
         project: "",
         time: "",
@@ -301,7 +301,7 @@ export default function App() {
   const [timer, setTimer] = useState<{
     start: number | null;
     stop: number | null;
-  }>(() => stored("worknotes.timer", { start: null, stop: null }));
+  }>(() => stored("worklog.timer", { start: null, stop: null }));
   const [now, setNow] = useState(Date.now());
   const localDay = today();
   useEffect(() => {
@@ -342,11 +342,11 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [reportCopied]);
   const [reportGrouping, setReportGrouping] = useState<ReportGrouping>(() => {
-    const saved = stored<string>("worknotes.reportGrouping", "project");
+    const saved = stored<string>("worklog.reportGrouping", "project");
     return saved === "day" || saved === "task" ? saved : "project";
   });
   useEffect(() => {
-    localStorage.setItem("worknotes.reportGrouping", JSON.stringify(reportGrouping));
+    localStorage.setItem("worklog.reportGrouping", JSON.stringify(reportGrouping));
   }, [reportGrouping]);
   const [detailsDate, setDetailsDate] = useState(today());
   const [detailsEntryId, setDetailsEntryId] = useState<string | null>(null);
@@ -367,7 +367,13 @@ export default function App() {
     timerHidden: boolean;
   } | null>(null);
   const projectSelector = useRef<HTMLDivElement>(null);
+  const ensureWorkspace = () => {
+    if (dataRef.current.root) return true;
+    void pickWorkspace();
+    return false;
+  };
   const guideProjectCreation = () => {
+    if (!ensureWorkspace()) return;
     setProjectHelp(true);
     projectSelector.current?.querySelector("input")?.focus();
   };
@@ -405,7 +411,7 @@ export default function App() {
   const persistPending = () => {
     if (desktop && dataRef.current.root)
       localStorage.setItem(
-        `worknotes.noteDrafts:${dataRef.current.root}`,
+        `worklog.noteDrafts:${dataRef.current.root}`,
         JSON.stringify([...pending.current]),
       );
   };
@@ -481,12 +487,12 @@ export default function App() {
         dataRef.current = d;
         pending.current = new Map(
           stored<[string, { content: string; expected: string }][]>(
-            `worknotes.noteDrafts:${d.root}`,
+            `worklog.noteDrafts:${d.root}`,
             [],
           ),
         );
-        setWs(stored(`worknotes.sessions.v3:${d.root}`, initialWorkspace));
-        const savedDraft = stored<Draft>(`worknotes.draft.v3:${d.root}`, {
+        setWs(stored(`worklog.sessions.v3:${d.root}`, initialWorkspace));
+        const savedDraft = stored<Draft>(`worklog.draft.v3:${d.root}`, {
           date: today(),
           project: "",
           time: "",
@@ -510,7 +516,7 @@ export default function App() {
         setStatus(
           pending.current.size
             ? "Recovered unsaved note drafts"
-            : "Saved locally",
+            : d.root ? "Saved locally" : "Choose a workspace to begin",
         );
       })
       .catch((e) => {
@@ -521,19 +527,19 @@ export default function App() {
   useEffect(() => {
     if (data.root)
       localStorage.setItem(
-        `worknotes.sessions.v3:${data.root}`,
+        `worklog.sessions.v3:${data.root}`,
         JSON.stringify(ws),
       );
   }, [ws]);
   useEffect(() => {
     if (data.root)
       localStorage.setItem(
-        `worknotes.draft.v3:${data.root}`,
+        `worklog.draft.v3:${data.root}`,
         JSON.stringify(draft),
       );
   }, [draft]);
   useEffect(() => {
-    localStorage.setItem("worknotes.timer", JSON.stringify(timer));
+    localStorage.setItem("worklog.timer", JSON.stringify(timer));
   }, [timer]);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -608,6 +614,7 @@ export default function App() {
         (modal && modal !== "switcher")
       )
         return;
+      if (!ensureWorkspace()) return;
       if (
         (action === "newNote" || action === "dailyNote") &&
         !busyRef.current
@@ -635,7 +642,7 @@ export default function App() {
       } else if (action === "save") flush().catch(() => {});
       else if (action === "closeNote") closeTab(ws.active);
       else if (action === "find" && ws.active)
-        window.dispatchEvent(new Event("worknotes:find"));
+        window.dispatchEvent(new Event("worklog:find"));
     };
     window.addEventListener("keydown", listener, true);
     return () => window.removeEventListener("keydown", listener, true);
@@ -768,6 +775,7 @@ export default function App() {
     void navigateTask(id);
   };
   const openNote = (path: string, cursor?: number) => {
+    if (!ensureWorkspace()) return;
     void navigateTask(tabTask(path), path, cursor);
   };
   const [overviewVisit, setOverviewVisit] = useState(0);
@@ -829,14 +837,15 @@ export default function App() {
   };
   const rememberCode = (code: string) =>
     localStorage.setItem(
-      `worknotes.lastCode:${data.root}`,
+      `worklog.lastCode:${data.root}`,
       JSON.stringify(code),
     );
   const createProject = (name: string, forForm = false) => {
+    if (!ensureWorkspace()) return;
     const last =
       forForm && draft.projectCodeId
         ? draft.projectCodeId
-        : stored<string>(`worknotes.lastCode:${data.root}`, "");
+        : stored<string>(`worklog.lastCode:${data.root}`, "");
     setCreatingTask({
       name,
       forForm,
@@ -914,6 +923,7 @@ export default function App() {
     projectId = ws.project,
     suggestedName = "",
   ) => {
+    if (!ensureWorkspace()) return;
     setError("");
     setCreatingNote({
       folder,
@@ -927,6 +937,7 @@ export default function App() {
       ? today()
       : "";
   const newItemAt = (folder: boolean, path: string) => {
+    if (!ensureWorkspace()) return;
     const global = path.startsWith("global/");
     const base = path.split("/").slice(global ? 2 : 3).join("/");
     setError("");
@@ -1120,9 +1131,9 @@ export default function App() {
         setRemote(result.remote);
         setBackupPath(result.backupPath);
         setBackupTime(result.backupTime);
-        setWs(stored(`worknotes.sessions.v3:${result.root}`, initialWorkspace));
+        setWs(stored(`worklog.sessions.v3:${result.root}`, initialWorkspace));
         setDraft(
-          stored(`worknotes.draft.v3:${result.root}`, {
+          stored(`worklog.draft.v3:${result.root}`, {
             date: today(),
             project: "",
             time: "",
@@ -1258,7 +1269,14 @@ export default function App() {
     }
   }, [modal, data, from, through, reportGrouping]);
   useEffect(() => setReportCopied(false), [modal, reportText]);
-  const timeForm = (
+  const timeForm = !data.root ? (
+    <div className="time-body">
+      <p>Choose a workspace to create tasks, write notes, and log time.</p>
+      <button onClick={pickWorkspace}>
+        <Folder size={15} />Choose workspace
+      </button>
+    </div>
+  ) : (
     <>
       <div className="panel-heading">
         <span>
@@ -1524,6 +1542,7 @@ export default function App() {
           <button
             className="search-trigger"
             onClick={() => {
+              if (!ensureWorkspace()) return;
               setModal("switcher");
               setQuery("");
             }}
@@ -1535,6 +1554,7 @@ export default function App() {
           <button
             title={`Search note contents (${bindings.searchNotes || "unassigned"})`}
             onClick={() => {
+              if (!ensureWorkspace()) return;
               setModal("searchNotes");
               setQuery("");
               setChoice(0);
@@ -1544,14 +1564,18 @@ export default function App() {
             <Search size={15} />
             Search notes
           </button>
-          <button data-tour="reports" onClick={() => setModal("report")}>
+          <button data-tour="reports" onClick={() => {
+            if (ensureWorkspace()) setModal("report");
+          }}>
             <FileText size={15} />
             Reports
           </button>
           <button
             className={ws.panel ? "active-action" : ""}
             title={`Toggle time panel (${bindings.timePanel || "unassigned"}) · Popup (${bindings.timePopup || "unassigned"})${draft.time || draft.note || draft.overridden ? " · Draft for " + data.projects.find((p) => p.id === draft.project)?.name : ""}`}
-            onClick={() => setWs((w) => ({ ...w, panel: !w.panel }))}
+            onClick={() => {
+              if (ensureWorkspace()) setWs((w) => ({ ...w, panel: !w.panel }));
+            }}
           >
             <PanelRightOpen size={16} />
             Log time
@@ -1647,12 +1671,18 @@ export default function App() {
                 <Plus size={14} />
               </button>
             </div>
-            <ProjectInput
-              projects={data.projects}
-              value={ws.project}
-              onPick={(p) => activate(p.id)}
-              onCreate={(name) => createProject(name)}
-            />
+            {data.root ? (
+              <ProjectInput
+                projects={data.projects}
+                value={ws.project}
+                onPick={(p) => activate(p.id)}
+                onCreate={(name) => createProject(name)}
+              />
+            ) : (
+              <button onClick={pickWorkspace}>
+                <Folder size={15} />Choose workspace
+              </button>
+            )}
             {projectHelp && (
               <div
                 className="project-tutorial"
@@ -1682,61 +1712,69 @@ export default function App() {
             )}
           </div>
           <div className="tree">
-            <NoteTree
-              key={data.root + "global"}
-              workspace={data.root}
-              onNewNote={(path) => newItemAt(false, path)}
-              onNewFolder={(path) => newItemAt(true, path)}
-              notes={data.notes}
-              folders={data.folders}
-              prefix="global/notes"
-              defaultCollapsed
-              projectName="Global notes"
-              active={ws.active}
-              onOpen={openNote}
-              onOverview={() => openNote("global:overview")}
-              overviewActive={ws.active === "global:overview"}
-              onMove={moveNote}
-              onRename={renameNote}
-              onDelete={deleteItem}
-              onReveal={revealItem}
-              onMoveProject={(path) => {
-                setMoveSource(path);
-                setModal("moveProject");
-              }}
-              onPin={pinNote}
-              pinned={ws.pinned || []}
-              disabled={busy || !desktop}
-            />
-            <NoteTree
-              key={data.root + noteRoot}
-              workspace={data.root}
-              onNewNote={(path) => newItemAt(false, path)}
-              onNewFolder={(path) => newItemAt(true, path)}
-              notes={data.notes}
-              folders={data.folders}
-              prefix={noteRoot}
-              projectName={activeProject?.name || "Task notes"}
-              active={ws.active}
-              onOpen={(path) => {
-                if (!busyRef.current) openNote(path);
-              }}
-              onOverview={
-                activeProject ? () => openOverview(activeProject.id) : undefined
-              }
-              overviewActive={ws.active === overviewTab(ws.project)}
-              onMove={moveNote}
-              onRename={renameNote}
-              onDelete={deleteItem}
-              onReveal={revealItem}
-              onMoveProject={(path) => {
-                setMoveSource(path);
-                setModal("moveProject");
-              }}
-              onPin={pinNote}
-              pinned={ws.pinned || []}
-              disabled={busy || !desktop}
-            />
+            {data.root ? (
+              <>
+                <NoteTree
+                  key={data.root + "global"}
+                  workspace={data.root}
+                  onNewNote={(path) => newItemAt(false, path)}
+                  onNewFolder={(path) => newItemAt(true, path)}
+                  notes={data.notes}
+                  folders={data.folders}
+                  prefix="global/notes"
+                  defaultCollapsed
+                  projectName="Global notes"
+                  active={ws.active}
+                  onOpen={openNote}
+                  onOverview={() => openNote("global:overview")}
+                  overviewActive={ws.active === "global:overview"}
+                  onMove={moveNote}
+                  onRename={renameNote}
+                  onDelete={deleteItem}
+                  onReveal={revealItem}
+                  onMoveProject={(path) => {
+                    setMoveSource(path);
+                    setModal("moveProject");
+                  }}
+                  onPin={pinNote}
+                  pinned={ws.pinned || []}
+                  disabled={busy || !desktop}
+                />
+                <NoteTree
+                  key={data.root + noteRoot}
+                  workspace={data.root}
+                  onNewNote={(path) => newItemAt(false, path)}
+                  onNewFolder={(path) => newItemAt(true, path)}
+                  notes={data.notes}
+                  folders={data.folders}
+                  prefix={noteRoot}
+                  projectName={activeProject?.name || "Task notes"}
+                  active={ws.active}
+                  onOpen={(path) => {
+                    if (!busyRef.current) openNote(path);
+                  }}
+                  onOverview={
+                    activeProject ? () => openOverview(activeProject.id) : undefined
+                  }
+                  overviewActive={ws.active === overviewTab(ws.project)}
+                  onMove={moveNote}
+                  onRename={renameNote}
+                  onDelete={deleteItem}
+                  onReveal={revealItem}
+                  onMoveProject={(path) => {
+                    setMoveSource(path);
+                    setModal("moveProject");
+                  }}
+                  onPin={pinNote}
+                  pinned={ws.pinned || []}
+                  disabled={busy || !desktop}
+                />
+                  </>
+            ) : (
+              <button onClick={() => newItem(false, "global")}>
+                <FileText size={15} />Create a note
+              </button>
+            )}
           </div>
           <div className="sidebar-bottom">
             {!data.root && (
@@ -1827,7 +1865,7 @@ export default function App() {
             <button
               className="icon new-tab"
               title={`New note (${bindings.newNote || "unassigned"})`}
-              disabled={!data.root}
+              disabled={busy || !desktop}
               onClick={() => newItem()}
             >
               <Plus size={16} />
@@ -1907,7 +1945,7 @@ export default function App() {
                         <button
                           onClick={() =>
                             window.dispatchEvent(
-                              new Event("worknotes:insert-mermaid"),
+                              new Event("worklog:insert-mermaid"),
                             )
                           }
                         >
@@ -2034,15 +2072,21 @@ export default function App() {
               </div>
               <div className="eyebrow">LESS FRICTION. MORE FOCUS.</div>
               <h1>
-                {data.root && !activeProject
+                {!data.root ? "Choose a workspace to begin" : !activeProject
                   ? "No open tasks"
                   : `No notes open for ${activeProject?.name || "this task"}`}
               </h1>
               {!data.root ? (
-                <button className="primary" onClick={pickWorkspace}>
-                  <Folder size={17} />
-                  Choose a data folder
-                </button>
+                <>
+                  <p>
+                    Your tasks, notes, and time entries live in a folder you choose.
+                    Open an existing workspace or select an empty folder to start.
+                  </p>
+                  <button className="primary" onClick={pickWorkspace}>
+                    <Folder size={17} />
+                    Choose a data folder
+                  </button>
+                </>
               ) : (
                 <button
                   className="primary"
@@ -2127,6 +2171,7 @@ export default function App() {
             className="use-time"
             disabled={seconds < 60}
             onClick={() => {
+              if (!ensureWorkspace()) return;
               setDraft((d) => ({ ...d, time: `${Math.floor(seconds / 60)}m` }));
               setWs((w) => ({ ...w, panel: true }));
             }}
@@ -2450,12 +2495,16 @@ export default function App() {
                   </div>
                 ))}
                 <h3>Tasks</h3>
-                <ProjectInput
-                  projects={data.projects}
-                  value={ws.project}
-                  onPick={(p) => activate(p.id)}
-                  onCreate={(name) => createProject(name)}
-                />
+                {data.root ? (
+                  <ProjectInput
+                    projects={data.projects}
+                    value={ws.project}
+                    onPick={(p) => activate(p.id)}
+                    onCreate={(name) => createProject(name)}
+                  />
+                ) : (
+                  <button onClick={pickWorkspace}>Choose workspace to create tasks</button>
+                )}
                 {activeProject && (
                   <label>
                     Default project code
@@ -2771,7 +2820,7 @@ export default function App() {
                 />
               </label>
               {creatingTask.code ===
-                stored(`worknotes.lastCode:${data.root}`, "") && (
+                stored(`worklog.lastCode:${data.root}`, "") && (
                 <small>Last used</small>
               )}
               {error && <p role="alert">{error}</p>}

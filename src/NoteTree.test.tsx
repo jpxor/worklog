@@ -30,7 +30,7 @@ function setup(disabled = false) {
 function transfer(path: string) {
   const values: Record<string, string> = {};
   const dataTransfer = {
-    types: ["application/x-worknotes-note"],
+    types: ["application/x-worklog-note"],
     setData: (type: string, value: string) => {
       values[type] = value;
     },
@@ -38,7 +38,7 @@ function transfer(path: string) {
     effectAllowed: "",
     dropEffect: "",
   };
-  dataTransfer.setData("application/x-worknotes-note", path);
+  dataTransfer.setData("application/x-worklog-note", path);
   return dataTransfer;
 }
 it("opens the overview from the project root without changing its drop behavior", () => {

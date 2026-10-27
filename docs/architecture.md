@@ -24,7 +24,7 @@ Notes remain Markdown/UTF-8 text, attachments keep their original bytes, and tim
 
 ## Change constraints
 
-- Preserve `worknotes` package/executable names, `local.worknotes.desktop`, storage keys, `worknotes.json`, and backup names unless an explicit compatibility design replaces them.
+- Preserve `worklog` package/executable names, `local.worklog.desktop`, storage keys, `worklog.json`, and backup names unless an explicit compatibility design replaces them.
 - Validate user-controlled paths at the Rust boundary, including traversal, workspace roots, symlinks, and source/destination collisions. Read-only MCP must not introduce mutation or arbitrary filesystem access.
 - Preserve atomic writes, stale-edit protection, locking, and backup/restore integrity. Never silently discard malformed ledger data or bypass format validation.
 - Git history and backups can retain deleted data. Test restore against a disposable destination and keep any destructive operation explicit.

@@ -10,7 +10,7 @@ import { ChevronDown, ChevronRight, FileText, Folder, Pin } from "lucide-react";
 import type { Note } from "./model";
 import FileIcon from "./FileIcon";
 
-const noteType = "application/x-worknotes-note";
+const noteType = "application/x-worklog-note";
 export default function NoteTree({
   notes,
   folders,
@@ -54,7 +54,7 @@ export default function NoteTree({
   disabled?: boolean;
   defaultCollapsed?: boolean;
 }) {
-  const key = `worknotes.tree:${workspace}:${prefix}`;
+  const key = `worklog.tree:${workspace}:${prefix}`;
   const [collapsed, setCollapsed] = useState<string[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(key) || "[]");
@@ -82,7 +82,7 @@ export default function NoteTree({
     folder: boolean,
   ) => {
     event.preventDefault();
-    window.dispatchEvent(new Event("worknotes:close-context-menus"));
+    window.dispatchEvent(new Event("worklog:close-context-menus"));
     event.currentTarget.focus();
     const rect = event.currentTarget.getBoundingClientRect();
     setMenu({

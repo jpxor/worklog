@@ -344,8 +344,8 @@ export default function Editor({
       });
       view.focus();
     };
-    window.addEventListener("worknotes:find", find);
-    window.addEventListener("worknotes:insert-mermaid", insertMermaid);
+    window.addEventListener("worklog:find", find);
+    window.addEventListener("worklog:insert-mermaid", insertMermaid);
     view.focus();
     if (!position && cursor)
       view.dispatch({
@@ -372,8 +372,8 @@ export default function Editor({
     return () => {
       view.scrollDOM.removeEventListener("scroll", capture);
       view.destroy();
-      window.removeEventListener("worknotes:find", find);
-      window.removeEventListener("worknotes:insert-mermaid", insertMermaid);
+      window.removeEventListener("worklog:find", find);
+      window.removeEventListener("worklog:insert-mermaid", insertMermaid);
       editor.current = null;
     };
     // Parent keys the editor by note path; edits are owned by this editor instance.

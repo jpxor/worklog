@@ -1,6 +1,6 @@
 # WorkLog specification
 
-Product specification based on the agreed WorkLog requirements. Formerly named WorkNotes; retain the existing internal application identity, settings keys, data marker, and backup directory names for compatibility.
+Product specification based on the agreed WorkLog requirements. Use WorkLog consistently for product names and `worklog` for executable, package, storage, and workspace identifiers.
 
 ## Purpose
 

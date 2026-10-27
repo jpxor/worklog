@@ -5535,8 +5535,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
-name = "worknotes"
-version = "0.1.28"
+name = "worklog"
+version = "0.2.0"
 dependencies = [
  "axum",
  "axum-server",

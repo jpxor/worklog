@@ -2,7 +2,7 @@
 
 WorkLog stores notes, time records, project codes, and attachments in the workspace folder you choose. Notes and ledger files are plain text, and local storage does not encrypt them. OS permissions, device security, and any synchronization service on that folder affect who can access the data.
 
-App settings live separately in Tauri's application data directory for `local.worknotes.desktop`. Backend configuration includes the selected workspace and backup settings (`settings.json`), MCP configuration and bearer token (`mcp-sharing.json`), and reminder settings (`timesheet-reminder.json`). UI preferences such as appearance, shortcuts, and tab/editor state use WebView local storage. Treat application data as sensitive too; avoid publishing settings files or a real WebView profile.
+App settings live separately in Tauri's application data directory for `local.worklog.desktop`. Backend configuration includes the selected workspace and backup settings (`settings.json`), MCP configuration and bearer token (`mcp-sharing.json`), and reminder settings (`timesheet-reminder.json`). UI preferences such as appearance, shortcuts, and tab/editor state use WebView local storage. Treat application data as sensitive too; avoid publishing settings files or a real WebView profile.
 
 Local Git history and configured folder/Git backups can preserve previous versions of edited or deleted records. Git remotes use your installed Git and existing credentials; remote providers and folder synchronization services have their own access and retention policies. Deleting a note or sending it to Trash does not erase its history, backups, synchronized copies, or OS recovery copies. See [backup and recovery](user-guide.md#history-and-backups).
 
