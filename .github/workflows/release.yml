@@ -37,9 +37,9 @@ jobs:
           node-version: 22
       - name: Validate tag, release metadata and main ancestry
         run: |
-          node scripts/release.mjs --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/worklog-release-notes.md"
           test "$(git rev-parse HEAD)" = "$(git rev-parse --verify --end-of-options "refs/tags/${RELEASE_TAG}^{commit}")"
           git merge-base --is-ancestor HEAD origin/main
+          node scripts/release.mjs --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/worklog-release-notes.md"
       - name: Find successful build for this exact commit
         id: build
         run: node scripts/ci.mjs release-build >> "$GITHUB_OUTPUT"
