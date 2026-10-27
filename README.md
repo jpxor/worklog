@@ -115,11 +115,11 @@ npm run release:check
 npm run tauri build
 ```
 
-The included [GitHub Actions workflow](.github/workflows/build.yml) runs checks and builds Windows NSIS installers and Ubuntu 22.04 DEB/AppImage packages. Local build output is under `src-tauri/target/release/`; packaged installers are under its `bundle/` directory. Ubuntu 20.04 compatibility is not verified.
+The [build workflow](.github/workflows/build.yml) runs frontend checks once on Linux and Rust tests on Windows and Linux. PRs skip installer packaging; code changes on `main` build Windows NSIS and Ubuntu 22.04 DEB packages, including Ubuntu 24.04 package checks. Documentation-only changes skip expensive desktop work. Local build output is under `src-tauri/target/release/`; packaged installers are under its `bundle/` directory. Ubuntu 20.04 is unsupported.
 
 See the [development guide](docs/development.md) for setup, the Windows helper script, checks, and packaging, and [architecture](docs/architecture.md) for module boundaries and workspace invariants.
 
-Pushing a `vX.Y.Z` tag runs checks/builds and automatically publishes a GitHub release with installers, standalone binaries, and SHA-256 checksums. All npm/Cargo/Tauri version metadata and release notes must agree. Follow the [release guide](docs/releasing.md) for version updates, release notes, testing, publication, and recovery.
+Pushing a `vX.Y.Z` tag runs security checks and the [publication workflow](.github/workflows/release.yml), which reuses verified package artifacts from a successful build of that exact commit instead of rebuilding. All npm/Cargo/Tauri version metadata and release notes must agree. Package artifacts are retained for seven days; expired artifacts require an explicit rebuild at the tag before publication. Follow the [release guide](docs/releasing.md) for version updates, release notes, testing, publication, and recovery.
 
 The GitHub Pages source is in [`site/`](site/). With Pages enabled using GitHub Actions in repository settings, the **Deploy project page** workflow automatically deploys changes to `site/`, its source screenshot (`docs/screenshots/project-overview-light.png`), or the Pages workflow when pushed to `main`. The workflow can also be run manually. Release tags do not deploy the site.
 

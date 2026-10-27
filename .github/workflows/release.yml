@@ -1,0 +1,84 @@
+name: Publish verified WorkLog release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  security:
+    uses: ./.github/workflows/security.yml
+  publish:
+    needs: security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Validate tag, release metadata and main ancestry
+        run: |
+          node scripts/release.mjs --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/worklog-release-notes.md"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse --verify --end-of-options "refs/tags/${RELEASE_TAG}^{commit}")"
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Find successful build for this exact commit
+        id: build
+        run: node scripts/ci.mjs release-build >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: WorkLog-Windows
+          path: artifacts/WorkLog-Windows
+          run-id: ${{ steps.build.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: WorkLog-Linux
+          path: artifacts/WorkLog-Linux
+          run-id: ${{ steps.build.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - name: Verify package provenance and licensing
+        env:
+          BUILD_RUN_ID: ${{ steps.build.outputs.run-id }}
+        run: |
+          node scripts/ci.mjs verify-artifacts artifacts "$BUILD_RUN_ID"
+          node scripts/verify-distribution.mjs artifacts/WorkLog-Windows
+          node scripts/verify-distribution.mjs artifacts/WorkLog-Linux
+      - name: Prepare release files without rebuilding
+        run: |
+          mkdir release portable-windows
+          cp LICENSE release/LICENSE.txt
+          cp THIRD-PARTY-NOTICES.txt release/
+          tar -czf release/WorkLog-third-party.tar.gz THIRD-PARTY-NOTICES.txt third-party
+          cp artifacts/WorkLog-Windows/worklog.exe portable-windows/WorkLog.exe
+          cp LICENSE THIRD-PARTY-NOTICES.txt portable-windows/
+          cp -r third-party portable-windows/
+          (cd portable-windows && zip -qr ../release/WorkLog-windows-x64.zip .)
+          cp artifacts/WorkLog-Windows/bundle/nsis/*.exe release/
+          cp artifacts/WorkLog-Linux/bundle/deb/*.deb release/
+          chmod +x artifacts/WorkLog-Linux/worklog
+          tar -czf release/WorkLog-linux-x64.tar.gz LICENSE THIRD-PARTY-NOTICES.txt third-party -C artifacts/WorkLog-Linux worklog
+          cd release
+          sha256sum * > SHA256SUMS.txt
+      - name: Publish release
+        run: |
+          gh release create "$RELEASE_TAG" release/* --draft --verify-tag --title "WorkLog $RELEASE_TAG" --notes-file "$RUNNER_TEMP/worklog-release-notes.md"
+          gh release edit "$RELEASE_TAG" --draft=false --latest
