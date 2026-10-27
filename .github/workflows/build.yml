@@ -20,6 +20,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - run: node --test scripts/ci-tests.mjs scripts/release-tests.mjs
+      - run: node scripts/release.mjs
       - id: paths
         run: node scripts/ci.mjs changes >> "$GITHUB_OUTPUT"
   frontend:
@@ -38,9 +40,6 @@ jobs:
       - run: npm ci
       - run: npm run notices:check
       - run: npm run test:notices
-      - run: npm run test:release
-      - run: node --test scripts/ci-tests.mjs
-      - run: npm run release:check
       - run: npm test
       - run: npm run build
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
