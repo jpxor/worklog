@@ -51,7 +51,7 @@ A partially filled time draft survives editor task navigation. The mismatch noti
 
 Each task remembers its own tabs, order, focus, cursor, and scroll positions. Global tabs stay open across switches and show a Global marker and ownership breadcrumb. Global notes belong to this workspace. Their separate root opens a global-only overview of unchecked items, recent notes, and pins, without time totals. Global checkboxes do not appear in task overviews.
 
-Ctrl+N defaults to the selected task even while a global note is active; choose Global notes explicitly to create there. Today's log remains task-owned. Use Move or drag notes/folders between roots; occupied destinations are never overwritten. Global notes, attachments, and code metadata are included in Git history and backups. Tab sessions and recovery drafts remain machine-local.
+Ctrl+N defaults to the selected task even while a global note is active; choose Global notes explicitly to create there. The creation dialog offers only the active task and Global notes; switch tasks first to create a note or folder for another task. Today's log remains task-owned. Use Move or drag notes/folders between roots; occupied destinations are never overwritten. Global notes, attachments, and code metadata are included in Git history and backups. Tab sessions and recovery drafts remain machine-local.
 
 ## Notes and diagrams
 
