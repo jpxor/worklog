@@ -1535,6 +1535,26 @@ export default function App() {
       </div>
     </>
   );
+  if (desktop && !data.root) {
+    return (
+      <div className="app welcome-screen">
+        <main className="empty-workspace">
+          <div className="empty-icon"><BookOpen size={35} /></div>
+          <div className="eyebrow">WorkLog</div>
+          <h1>Choose a workspace to begin</h1>
+          <p>
+            Your tasks, notes, and time entries live in a folder you choose.<br />
+            Open an existing workspace or select an empty folder to start.
+          </p>
+          {error && <p role="alert">{error}</p>}
+          <button className="primary" disabled={busy} onClick={pickWorkspace}>
+            <Folder size={17} />
+            {busy ? "Opening workspace…" : "Open workspace directory"}
+          </button>
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="app">
       <header className="topbar">
@@ -1746,7 +1766,7 @@ export default function App() {
                   pinned={ws.pinned || []}
                   disabled={busy || !desktop}
                 />
-                <NoteTree
+                {activeProject && <NoteTree
                   key={data.root + noteRoot}
                   workspace={data.root}
                   onNewNote={(path) => newItemAt(false, path)}
@@ -1775,7 +1795,7 @@ export default function App() {
                   onPin={pinNote}
                   pinned={ws.pinned || []}
                   disabled={busy || !desktop}
-                />
+                />}
                   </>
             ) : (
               <button onClick={() => newItem(false, "global")}>

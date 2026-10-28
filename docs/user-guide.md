@@ -14,6 +14,8 @@ See [development checks and packaging](development.md#checks) and the [release g
 
 ## Using WorkLog
 
+Before a workspace is open, WorkLog shows a single **Open workspace directory** action. Select an existing WorkLog workspace or an empty folder; the sidebar, toolbar, and time controls appear after it opens. Cancelling leaves the welcome screen in place.
+
 Click the task name at the top of the notes tree to open its overview. Notes containing unfinished Markdown checkboxes (`- [ ] Follow up`) appear first, with the most recently edited notes first in each group. Check an item directly to update its original note, or click its text to open the note at that line. Note titles open their files. The overview stays stationary while you use it; completed items remain visible until you leave and reopen it. Dates come from file modification times and can change when files are copied or cloned. There is no separate task store.
 
 1. Choose an empty local data folder or open existing WorkLog data.

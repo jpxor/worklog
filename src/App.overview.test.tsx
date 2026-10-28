@@ -69,29 +69,20 @@ beforeEach(() => {
     );
 });
 afterEach(cleanup);
-it("routes workspace actions to folder selection without opening creation forms when cancelled", async () => {
+it("shows only the workspace action before opening a workspace and keeps it after cancellation", async () => {
   data = { ...emptySnapshot };
   render(<App />);
   await screen.findByRole("heading", { name: "Choose a workspace to begin" });
-  await waitFor(() => expect(screen.getByText("Choose a workspace to begin", { selector: ".statusbar span" })).toBeTruthy());
   expect(screen.queryByRole("combobox", { name: "Task" })).toBeNull();
   expect(screen.queryByRole("textbox", { name: "Duration" })).toBeNull();
-  const actions = [
-    screen.getByTitle("Create task"),
-    screen.getByRole("button", { name: "Create a note" }),
-    screen.getByTitle(/^New note/),
-    screen.getByRole("button", { name: /Jump to anything/ }),
-    screen.getByRole("button", { name: "Search notes" }),
-    screen.getByRole("button", { name: "Reports" }),
-    screen.getByRole("button", { name: "Log time" }),
-  ];
-  for (const [index, button] of actions.entries()) {
-    fireEvent.click(button);
-    await waitFor(() => expect(directory).toHaveBeenCalledTimes(index + 1));
-    await act(async () => {});
-  }
+  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(document.querySelector(".sidebar, .topbar, .tabs, .time-panel, .timer, .statusbar")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Open workspace directory" }));
+  await waitFor(() => expect(directory).toHaveBeenCalledTimes(1));
+  await act(async () => {});
+  expect(screen.getAllByRole("button")).toHaveLength(1);
   fireEvent.keyDown(window, { key: "n", ctrlKey: true });
-  await waitFor(() => expect(directory).toHaveBeenCalledTimes(actions.length + 1));
+  await waitFor(() => expect(directory).toHaveBeenCalledTimes(2));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(mocks.request.mock.calls.map(([action]) => action)).toEqual(["load"]);
 });
@@ -102,7 +93,7 @@ it("enables normal task creation after a workspace is selected", async () => {
   vi.mocked(directory).mockResolvedValue("/chosen-workspace");
   mocks.request.mockImplementation(async (action) => action === "open_workspace" ? opened : data);
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "Choose a data folder" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Open workspace directory" }));
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("open_workspace", { path: "/chosen-workspace" }));
   await screen.findByRole("dialog", { name: "Create a task tutorial" });
   const taskInput = screen.getAllByRole("combobox", { name: "Task" })[0];
@@ -130,6 +121,8 @@ async function openOverview() {
 }
 it("offers note creation without an overview button when no notes are open", async () => {
   render(<App />);
+  await openOverview();
+  fireEvent.click(screen.getByTitle("Close tab"));
   await screen.findByRole("heading", { name: "No notes open for One" });
   expect(screen.getByRole("button", { name: "Create a note" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Open overview" })).toBeNull();
