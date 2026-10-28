@@ -4,6 +4,8 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Keep text selection visible through fenced code-block backgrounds in both appearances (#25).
+
 - Limit new note/folder destinations to the active task and Global notes. Switch tasks before creating content for another task (#24). Workspace data is unchanged.
 
 - Keep the start of long filenames visible in tabs and truncate the end with an ellipsis (#23).
