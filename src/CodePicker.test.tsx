@@ -9,10 +9,30 @@ import {
 import { afterEach, expect, it, vi } from "vitest";
 import CodePicker from "./CodePicker";
 afterEach(cleanup);
+it("offers an explicit no-default choice and renders its menu outside a clipped form", () => {
+  const onPick = vi.fn();
+  const { container } = render(<div style={{ overflow: "auto", height: 80 }}><CodePicker codes={codes} value="portal" allowNone portal onPick={onPick} onCreate={vi.fn()} onRestore={vi.fn()} /></div>);
+  fireEvent.focus(screen.getByRole("combobox"));
+  const list = screen.getByRole("listbox");
+  expect(list.parentElement).toBe(document.body);
+  expect(container.contains(list)).toBe(false);
+  fireEvent.click(screen.getByRole("option", { name: "No default" }));
+  expect(onPick).toHaveBeenCalledWith("");
+  expect(screen.queryByRole("listbox")).toBeNull();
+});
 const codes = [
   { id: "portal", label: "PORTAL", archived: false },
   { id: "old", label: "OLD", archived: true },
 ];
+it("overrides the normal menu top when a portaled list must open above its input", () => {
+  render(<CodePicker codes={codes} value="portal" portal onPick={vi.fn()} onCreate={vi.fn()} onRestore={vi.fn()} />);
+  const input = screen.getByRole("combobox");
+  vi.spyOn(input, "getBoundingClientRect").mockReturnValue(new DOMRect(20, window.innerHeight - 80, 200, 38));
+  fireEvent.focus(input);
+  const list = screen.getByRole("listbox");
+  expect(list.style.top).toBe("auto");
+  expect(list.style.bottom).toBe("84px");
+});
 it("creates a code by keyboard and selects its returned identity", async () => {
   const onPick = vi.fn(),
     onCreate = vi.fn().mockResolvedValue("support");

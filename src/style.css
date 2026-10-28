@@ -1,4 +1,5 @@
 :root {
+  --focus-ring: #2563a6;
   font-family: Inter, "Segoe UI", sans-serif;
   color: #30382f;
   background: #f6f5f1;
@@ -49,8 +50,15 @@ textarea {
 }
 input:focus,
 textarea:focus {
-  border-color: #7e9374;
-  box-shadow: 0 0 0 3px #7e937415;
+  border-color: var(--focus-ring);
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a[href]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 textarea {
   resize: vertical;
@@ -215,6 +223,16 @@ kbd {
   display: block;
   color: #89907d;
 }
+.combo-menu-portal {
+  position: fixed;
+  right: auto;
+  z-index: 100;
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.create-task-modal { width: 440px; max-width: calc(100vw - 40px); }
+.create-task-modal .settings-actions { justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 18px; border-top: 1px solid #dddfd4; }
+.create-task-modal .field-hint { line-height: 1.6; }
 .sidebar-section {
   display: flex;
   align-items: center;
@@ -1455,6 +1473,7 @@ kbd {
 .overview-todos button.completed { text-decoration: line-through; opacity: .6; }
 .overview-empty { padding: 40px 0; color: #747970; }
 .tree-root.selected { background: #e5eadd; color: #405636; }
+.tree-root-row .tree-new-note { flex: 0 0 auto; }
 [data-theme="dark"] .overview-note { border-color: #3d3d3d; }
 [data-theme="dark"] .overview-header p,
 [data-theme="dark"] .overview-note-heading time,
@@ -1552,7 +1571,7 @@ kbd {
 .time-history-action { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; min-height: 36px; }
 
 .create-note-form select { font: inherit; color: #30382f; background: #fffefa; border: 1px solid #dddfd4; border-radius: 6px; padding: 10px 11px; outline: none; }
-.create-note-form select:focus { border-color: #7e9374; box-shadow: 0 0 0 3px #7e937415; }
+.create-note-form select:focus { border-color: var(--focus-ring); }
 
 /* Keep the editor's search controls compact instead of inheriting form-field sizing. */
 .cm-panel.cm-search {

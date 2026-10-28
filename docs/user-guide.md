@@ -14,6 +14,10 @@ See [development checks and packaging](development.md#checks) and the [release g
 
 ## Using WorkLog
 
+In the note editor, **Tab** inserts a literal tab character (also in `.txt` notes). Press **Escape**, then **Tab** within two seconds to move keyboard focus out of the editor. **Shift+Tab** moves focus backward. App controls use a consistent blue ring when navigating with the keyboard.
+
+Before a workspace is open, WorkLog shows a single **Open workspace directory** action. Select an existing WorkLog workspace or an empty folder; the sidebar, toolbar, and time controls appear after it opens. Cancelling leaves the welcome screen in place.
+
 Click the task name at the top of the notes tree to open its overview. Notes containing unfinished Markdown checkboxes (`- [ ] Follow up`) appear first, with the most recently edited notes first in each group. Check an item directly to update its original note, or click its text to open the note at that line. Note titles open their files. The overview stays stationary while you use it; completed items remain visible until you leave and reopen it. Dates come from file modification times and can change when files are copied or cloned. There is no separate task store.
 
 1. Choose an empty local data folder or open existing WorkLog data.
@@ -45,13 +49,15 @@ To use an existing version-3 workspace from before this rename, close every app 
 
 ## Tasks, project codes, and Global notes
 
-Tasks hold notes, daily logs, attachments, and overviews. Project codes independently group time across tasks. Select or create codes inline in the time form. Each task has a default; each entry stores its own code. Changing a default affects future entries only. Editing an entry loads its saved code. New tasks suggest the last successfully used active code. Renames update historical code labels; archiving preserves history but prevents new assignments until restored.
+Tasks hold notes, daily logs, attachments, and overviews. Project codes independently group time across tasks. Select or create codes inline in the time form. New tasks start with **No default**; choosing a default project code is optional. After selecting or creating a code in the task dialog, focus moves to **Create task**. In **Settings → Tasks**, select a task and change or clear its default project code. Changing a default affects future entries and drafts using the task default, while saved time and explicit per-entry code choices are retained. Each time entry still requires an active project code; select one before logging time for a task without a default. Editing an entry loads its saved code. Renames update historical code labels; archiving preserves history but prevents new assignments until restored.
+
+No default is stored as an empty `defaultProjectCodeId` in format 3. Earlier builds that require a code on every task cannot open a workspace containing these tasks. Assign a default to every task before opening it in an earlier build.
 
 A partially filled time draft survives editor task navigation. The mismatch notice identifies its actual destination; Use current task explicitly retargets a new draft while retaining date, duration, and description. The timer fills that draft and never logs automatically.
 
 Each task remembers its own tabs, order, focus, cursor, and scroll positions. Global tabs stay open across switches and show a Global marker and ownership breadcrumb. Global notes belong to this workspace. Their separate root opens a global-only overview of unchecked items, recent notes, and pins, without time totals. Global checkboxes do not appear in task overviews.
 
-Ctrl+N defaults to the selected task even while a global note is active; choose Global notes explicitly to create there. The creation dialog offers only the active task and Global notes; switch tasks first to create a note or folder for another task. Today's log remains task-owned. Use Move or drag notes/folders between roots; occupied destinations are never overwritten. Global notes, attachments, and code metadata are included in Git history and backups. Tab sessions and recovery drafts remain machine-local.
+Ctrl+N creates a note in the selected task even while a global note is active. Use the [+] beside Global notes to create a global note. The creation dialog asks only for a name and shows the destination; switch tasks first to create a note or folder for another task. Today's log remains task-owned. Use Move or drag notes/folders between roots; occupied destinations are never overwritten. Global notes, attachments, and code metadata are included in Git history and backups. Tab sessions and recovery drafts remain machine-local.
 
 ## Notes and diagrams
 
@@ -117,6 +123,6 @@ Settings → LLM data access (MCP) starts an authenticated, read-only Streamable
 
 In Reports, choose **Group by: Project, Day, or Task**. Project groups time by project code; Day shows each day's project totals with task notes; Task groups time across project codes. The last selection is remembered. Date presets and custom ranges apply to every view. Copy and Export Markdown use the selected view, with bracketed durations, indented notes, and blank lines between entries.
 
-Global notes appear above the selected task's notes in the sidebar and start collapsed whenever the workspace opens. The two root folder rows replace the old section headers and creation buttons. Right-click either root or a folder to create a note or folder, or use the editor's New note button. The first global root note of the day suggests `YYYY-MM-DD`; you can replace that name. The create dialog provides the name, destination, and Cancel/Create actions. Time history is below today's total in the Log time panel, replacing Recent entries.
+Global notes appear above the selected task's notes in the sidebar and start collapsed whenever the workspace opens. Each root has a compact [+] to create a note, including while collapsed. Hover over the task [+] to see its configured keyboard shortcut. Right-click either root or a folder to create a note or folder, or use the editor's New note button for the current task. The first global root note of the day suggests `YYYY-MM-DD`; you can replace that name. The create dialog asks for a name and shows its destination. Time history is below today's total in the Log time panel, replacing Recent entries.
 
 The Log time form places Date and Duration side by side. **Use today** appears only when the date differs from today and resumes automatic dating without clearing the draft. When the entry task differs from the open task, **Use current task** appears beside the Task label; the task picker always shows where the time will be logged.

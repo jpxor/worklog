@@ -568,6 +568,14 @@ export default function App() {
       );
   }, [ws.project]);
   useEffect(() => {
+    setDraft((d) => {
+      if (!d.project || d.overridden || d.replaces) return d;
+      const project = data.projects.find((p) => p.id === d.project);
+      if (!project || d.projectCodeId === project.defaultProjectCodeId) return d;
+      return { ...d, projectCodeId: project.defaultProjectCodeId };
+    });
+  }, [data.projects]);
+  useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
       if (pending.current.size) {
         e.preventDefault();
@@ -826,6 +834,7 @@ export default function App() {
     code: string;
     forForm: boolean;
   } | null>(null);
+  const createTaskSubmit = useRef<HTMLButtonElement>(null);
   const createCode = async (label: string) => {
     const result = await run("create_project_code", { label });
     return result.projectCodes.find(
@@ -842,16 +851,10 @@ export default function App() {
     );
   const createProject = (name: string, forForm = false) => {
     if (!ensureWorkspace()) return;
-    const last =
-      forForm && draft.projectCodeId
-        ? draft.projectCodeId
-        : stored<string>(`worklog.lastCode:${data.root}`, "");
     setCreatingTask({
       name,
       forForm,
-      code: data.projectCodes.some((c) => c.id === last && !c.archived)
-        ? last
-        : "",
+      code: "",
     });
   };
   const saveTask = () =>
@@ -924,6 +927,10 @@ export default function App() {
     suggestedName = "",
   ) => {
     if (!ensureWorkspace()) return;
+    if (!projectId) {
+      guideProjectCreation();
+      return;
+    }
     setError("");
     setCreatingNote({
       folder,
@@ -1378,11 +1385,11 @@ export default function App() {
               onRestore={restoreCode}
             />
             <span className="field-hint">
-              {draft.projectCodeId ===
-              data.projects.find((p) => p.id === draft.project)
-                ?.defaultProjectCodeId
-                ? "Task default"
-                : "This entry only"}
+              {!draft.projectCodeId
+                ? "Choose a code to log time"
+                : draft.projectCodeId === data.projects.find((p) => p.id === draft.project)?.defaultProjectCodeId
+                  ? "Task default"
+                  : "This entry only"}
             </span>
           </label>
           <div className="time-entry-fields">
@@ -1531,6 +1538,26 @@ export default function App() {
       </div>
     </>
   );
+  if (desktop && !data.root) {
+    return (
+      <div className="app welcome-screen">
+        <main className="empty-workspace">
+          <div className="empty-icon"><BookOpen size={35} /></div>
+          <div className="eyebrow">WorkLog</div>
+          <h1>Choose a workspace to begin</h1>
+          <p>
+            Your tasks, notes, and time entries live in a folder you choose.<br />
+            Open an existing workspace or select an empty folder to start.
+          </p>
+          {error && <p role="alert">{error}</p>}
+          <button className="primary" disabled={busy} onClick={pickWorkspace}>
+            <Folder size={17} />
+            {busy ? "Opening workspace…" : "Open workspace directory"}
+          </button>
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="app">
       <header className="topbar">
@@ -1742,7 +1769,7 @@ export default function App() {
                   pinned={ws.pinned || []}
                   disabled={busy || !desktop}
                 />
-                <NoteTree
+                {activeProject && <NoteTree
                   key={data.root + noteRoot}
                   workspace={data.root}
                   onNewNote={(path) => newItemAt(false, path)}
@@ -1750,6 +1777,7 @@ export default function App() {
                   notes={data.notes}
                   folders={data.folders}
                   prefix={noteRoot}
+                  newNoteShortcut={bindings.newNote}
                   projectName={activeProject?.name || "Task notes"}
                   active={ws.active}
                   onOpen={(path) => {
@@ -1770,7 +1798,7 @@ export default function App() {
                   onPin={pinNote}
                   pinned={ws.pinned || []}
                   disabled={busy || !desktop}
-                />
+                />}
                   </>
             ) : (
               <button onClick={() => newItem(false, "global")}>
@@ -2098,11 +2126,6 @@ export default function App() {
                 >
                   <Plus size={17} />
                   {activeProject ? "Create a note" : "Create your first task"}
-                </button>
-              )}
-              {activeProject && (
-                <button onClick={() => openOverview(activeProject.id)}>
-                  Open overview
                 </button>
               )}
               <span className="shortcut-hint">
@@ -2511,6 +2534,8 @@ export default function App() {
                   <label>
                     Default project code
                     <CodePicker
+                      allowNone
+                      portal
                       codes={data.projectCodes}
                       value={activeProject.defaultProjectCodeId}
                       onPick={(defaultProjectCodeId) => {
@@ -2788,7 +2813,8 @@ export default function App() {
             if (e.key === "Escape") setCreatingTask(null);
           }}
         >
-          <section className="modal" role="dialog" aria-label="Create task">
+          <section className="modal create-task-modal" role="dialog" aria-modal="true" aria-label="Create task">
+            <header className="modal-header"><h2>Create task</h2></header>
             <form
               className="settings-body"
               onSubmit={(e) => {
@@ -2808,28 +2834,30 @@ export default function App() {
                 />
               </label>
               <label>
-                Default project code
+                Default project code (optional)
                 <CodePicker
+                  allowNone
+                  portal
                   codes={data.projectCodes}
                   value={creatingTask.code}
-                  onPick={(code) =>
+                  onPick={(code) => {
                     setCreatingTask((previous) =>
                       previous ? { ...previous, code } : previous,
-                    )
-                  }
+                    );
+                    createTaskSubmit.current?.focus();
+                  }}
                   onCreate={createCode}
                   onRestore={restoreCode}
                 />
               </label>
-              {creatingTask.code ===
-                stored(`worklog.lastCode:${data.root}`, "") && (
-                <small>Last used</small>
-              )}
+              <p className="field-hint">You can change this later in Settings → Tasks. Time entries still need a project code.</p>
               {error && <p role="alert">{error}</p>}
-              <button type="button" onClick={() => setCreatingTask(null)}>
-                Cancel
-              </button>
-              <button disabled={busy || !creatingTask.code}>Create task</button>
+              <div className="settings-actions">
+                <button type="button" onClick={() => setCreatingTask(null)}>
+                  Cancel
+                </button>
+                <button ref={createTaskSubmit} className="primary" disabled={busy || !creatingTask.name.trim()}>Create task</button>
+              </div>
             </form>
           </section>
         </div>
@@ -2868,35 +2896,11 @@ export default function App() {
                   }
                 />
               </label>
-              <label>
-                Create in
-                <select
-                  required
-                  aria-describedby="create-note-destination-hint"
-                  value={creatingNote.owner}
-                  onChange={(e) =>
-                    setCreatingNote({
-                      ...creatingNote,
-                      owner: e.target.value,
-                      base: "",
-                      name: creatingNote.name === suggestedNoteName(creatingNote.folder, creatingNote.owner, creatingNote.base)
-                        ? suggestedNoteName(creatingNote.folder, e.target.value)
-                        : creatingNote.name,
-                    })
-                  }
-                >
-                  <option value="">Select a task or Global notes</option>
-                  <option value="global">Global notes</option>
-                  {data.projects
-                    .filter((p) => !p.closed && p.id === ws.project)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <small id="create-note-destination-hint">Switch tasks first to create a note or folder for another task.</small>
+              <small>
+                {creatingNote.owner === "global"
+                  ? "Global notes"
+                  : data.projects.find((p) => p.id === creatingNote.owner)?.name}
+              </small>
               {creatingNote.base && <small>Folder: {creatingNote.base}</small>}
               {error && <p role="alert">{error}</p>}
               <div className="settings-actions">

@@ -4,7 +4,7 @@ WorkLog is a Tauri 2 desktop app with a React 19/TypeScript frontend, CodeMirror
 
 ## Prerequisites
 
-- Node.js **22.13 or newer**, npm, Git, and a current stable Rust toolchain. CI uses Node 22 and stable Rust. Check `node --version`, `npm --version`, `rustc --version`, and `cargo --version`.
+- Node.js **22.22.2 or newer** from a supported even-numbered release (24 requires 24.15+), npm, Git, and a current stable Rust toolchain. CI uses Node 22 and stable Rust. Check `node --version`, `npm --version`, `rustc --version`, and `cargo --version`.
 - Windows x64: Rust's MSVC toolchain, Visual Studio C++ build tools with a Windows SDK, and WebView2. Keep the Rust toolchain and native compiler compatible. The helper script also supports an existing Rust GNU/MSYS2 setup, but MSVC is the CI path.
 - Ubuntu 22.04 x86-64: install the native build dependencies below, in addition to Node and Rust.
 

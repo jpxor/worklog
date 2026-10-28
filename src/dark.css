@@ -1,5 +1,6 @@
 /* Neutral charcoal surfaces; syntax colors remain in the notes editor. */
 :root[data-theme="dark"] {
+  --focus-ring: #3794ff;
   color-scheme: dark;
   color: #dfdfdf;
   background: #202020;
@@ -24,7 +25,7 @@
 }
 [data-theme="dark"] input:focus,
 [data-theme="dark"] textarea:focus {
-  border-color: #a1a1a1;
+  border-color: var(--focus-ring);
 }
 [data-theme="dark"] kbd {
   color: #adadad;
@@ -318,11 +319,6 @@
 }
 [data-theme="dark"] .tab.active::before {
   background: #3794ff;
-}
-[data-theme="dark"] input:focus,
-[data-theme="dark"] textarea:focus {
-  border-color: #3794ff;
-  box-shadow: 0 0 0 2px #3794ff26;
 }
 [data-theme="dark"] .show-project-help .project-combo > input {
   border-color: #3794ff;

@@ -57,8 +57,7 @@ fn hash_data(root: &Path, current: &Path, hash: &mut DefaultHasher) -> Result<()
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
         let path = entry.path();
-        if current == root
-            && (entry.file_name() == ".git" || entry.file_name() == ".worklog.lock")
+        if current == root && (entry.file_name() == ".git" || entry.file_name() == ".worklog.lock")
         {
             continue;
         }
@@ -333,6 +332,12 @@ fn require_code(codes: &[Value], id: &str, active: bool) -> Result<()> {
     }
     Ok(())
 }
+fn require_default_code(codes: &[Value], id: &str, active: bool) -> Result<()> {
+    if id.is_empty() {
+        return Ok(());
+    }
+    require_code(codes, id, active)
+}
 fn validate_ledger(records: &[Value], projects: &HashSet<String>) -> Result<()> {
     let mut ids = HashSet::new();
     let mut active = HashMap::new();
@@ -567,10 +572,7 @@ impl Workspace {
             atomic(&root.join("project-codes.json"), b"[]\n")?;
             atomic(&root.join("global/notes/.gitkeep"), b"")?;
             atomic(&root.join("time.jsonl"), b"")?;
-            atomic(
-                &root.join(".gitignore"),
-                b".worklog.lock\n.worklog-tmp*\n",
-            )?;
+            atomic(&root.join(".gitignore"), b".worklog.lock\n.worklog-tmp*\n")?;
         }
         let format = read_json(&marker)?;
         if format["format"] != "worklog" || format["version"] != 3 {
@@ -668,7 +670,7 @@ impl Workspace {
         validate_entries(&records, &ids)?;
         let codes = read_codes(&self.safe("project-codes.json")?)?;
         for project in &projects {
-            require_code(&codes, field(project, "defaultProjectCodeId")?, false)?;
+            require_default_code(&codes, field(project, "defaultProjectCodeId")?, false)?;
         }
         for entry in &records {
             require_code(&codes, field(entry, "projectCodeId")?, false)?;
@@ -755,7 +757,7 @@ impl Workspace {
                     );
                 }
                 let code = field(&p, "defaultProjectCodeId")?;
-                require_code(snap["projectCodes"].as_array().unwrap(), code, true)?;
+                require_default_code(snap["projectCodes"].as_array().unwrap(), code, true)?;
                 let id = uuid::Uuid::new_v4().to_string();
                 let root = self.root()?.join("projects").join(&id);
                 fs::create_dir_all(root.join("notes")).map_err(err)?;
@@ -781,7 +783,7 @@ impl Workspace {
                     .iter()
                     .find(|v| v["id"] == id)
                     .is_none_or(|v| v["defaultProjectCodeId"] != code);
-                require_code(snap["projectCodes"].as_array().unwrap(), code, changed)?;
+                require_default_code(snap["projectCodes"].as_array().unwrap(), code, changed)?;
                 if !projects.iter().any(|v| v["id"] == id) {
                     return Err("Unknown project".into());
                 }
@@ -2109,6 +2111,50 @@ mod tests {
         fs::write(w.root().unwrap().join("time.jsonl"), "{\"partial\":").unwrap();
         assert!(w.snapshot().unwrap_err().contains("incomplete final line"));
         assert!(w.check_backup(&w.config.root).is_err());
+    }
+
+    #[test]
+    fn task_default_code_can_be_blank_assigned_and_cleared_without_changing_time() {
+        let (_d, mut w) = setup();
+        atomic(&w.root().unwrap().join("project-codes.json"), b"[]").unwrap();
+        let snap = w
+            .dispatch(
+                "create_project",
+                json!({"name":"Uncoded","defaultProjectCodeId":""}),
+            )
+            .unwrap();
+        let task = snap["projects"][0].clone();
+        assert_eq!(
+            w.snapshot().unwrap()["projects"][0]["defaultProjectCodeId"],
+            ""
+        );
+        let mut entry = json!({"type":"entry","id":"one","projectId":task["id"],"projectCodeId":"","date":"2026-10-18","minutes":45,"note":"original"});
+        assert!(w.dispatch("save_entry", json!({"entry":entry})).is_err());
+        let snap = w
+            .dispatch("create_project_code", json!({"label":"ASSIGNED"}))
+            .unwrap();
+        let code = snap["projectCodes"][0]["id"].clone();
+        let mut assigned = task.clone();
+        assigned["defaultProjectCodeId"] = code.clone();
+        w.dispatch("update_project", assigned).unwrap();
+        entry["projectCodeId"] = code.clone();
+        w.dispatch("save_entry", json!({"entry":entry})).unwrap();
+        let snap = w.dispatch("update_project", task.clone()).unwrap();
+        assert_eq!(snap["projects"][0]["defaultProjectCodeId"], "");
+        assert_eq!(snap["records"][0]["projectCodeId"], code);
+        assert_eq!(w.snapshot().unwrap()["records"][0], entry);
+        let mut invalid = task;
+        invalid["defaultProjectCodeId"] = json!("missing");
+        assert!(w.dispatch("update_project", invalid).is_err());
+        assert!(w
+            .dispatch(
+                "create_project",
+                json!({"name":"Invalid","defaultProjectCodeId":"missing"})
+            )
+            .is_err());
+        drop(w.lock.take());
+        let root = w.config.root.clone();
+        assert!(w.open(&root).is_ok());
     }
 
     #[test]

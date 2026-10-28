@@ -17,6 +17,7 @@ vi.mock("./api", () => ({
   directory: vi.fn(),
   exportFile: vi.fn(),
   confirmAction: vi.fn(),
+  mcpControl: vi.fn().mockRejectedValue(new Error("Unavailable in this test")),
 }));
 import App from "./App";
 import { directory, exportFile } from "./api";
@@ -48,8 +49,17 @@ beforeEach(() => {
     .mockImplementation(
       async (
         action: string,
-        payload: { expected: string; content: string; path: string },
+        payload: { expected: string; content: string; path: string; name: string; defaultProjectCodeId: string; id: string; label: string },
       ) => {
+        if (action === "create_project") {
+          data = { ...data, projects: [...data.projects, { id: "new-task", name: payload.name, closed: false, defaultProjectCodeId: payload.defaultProjectCodeId }] };
+        }
+        if (action === "update_project") {
+          data = { ...data, projects: data.projects.map((p) => p.id === payload.id ? { ...p, defaultProjectCodeId: payload.defaultProjectCodeId } : p) };
+        }
+        if (action === "create_project_code") {
+          data = { ...data, projectCodes: [...data.projectCodes, { id: "new-code", label: payload.label, archived: false }] };
+        }
         if (action === "create_note") {
           data = {
             ...data,
@@ -69,29 +79,20 @@ beforeEach(() => {
     );
 });
 afterEach(cleanup);
-it("routes workspace actions to folder selection without opening creation forms when cancelled", async () => {
+it("shows only the workspace action before opening a workspace and keeps it after cancellation", async () => {
   data = { ...emptySnapshot };
   render(<App />);
   await screen.findByRole("heading", { name: "Choose a workspace to begin" });
-  await waitFor(() => expect(screen.getByText("Choose a workspace to begin", { selector: ".statusbar span" })).toBeTruthy());
   expect(screen.queryByRole("combobox", { name: "Task" })).toBeNull();
   expect(screen.queryByRole("textbox", { name: "Duration" })).toBeNull();
-  const actions = [
-    screen.getByTitle("Create task"),
-    screen.getByRole("button", { name: "Create a note" }),
-    screen.getByTitle(/^New note/),
-    screen.getByRole("button", { name: /Jump to anything/ }),
-    screen.getByRole("button", { name: "Search notes" }),
-    screen.getByRole("button", { name: "Reports" }),
-    screen.getByRole("button", { name: "Log time" }),
-  ];
-  for (const [index, button] of actions.entries()) {
-    fireEvent.click(button);
-    await waitFor(() => expect(directory).toHaveBeenCalledTimes(index + 1));
-    await act(async () => {});
-  }
+  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(document.querySelector(".sidebar, .topbar, .tabs, .time-panel, .timer, .statusbar")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Open workspace directory" }));
+  await waitFor(() => expect(directory).toHaveBeenCalledTimes(1));
+  await act(async () => {});
+  expect(screen.getAllByRole("button")).toHaveLength(1);
   fireEvent.keyDown(window, { key: "n", ctrlKey: true });
-  await waitFor(() => expect(directory).toHaveBeenCalledTimes(actions.length + 1));
+  await waitFor(() => expect(directory).toHaveBeenCalledTimes(2));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(mocks.request.mock.calls.map(([action]) => action)).toEqual(["load"]);
 });
@@ -102,7 +103,7 @@ it("enables normal task creation after a workspace is selected", async () => {
   vi.mocked(directory).mockResolvedValue("/chosen-workspace");
   mocks.request.mockImplementation(async (action) => action === "open_workspace" ? opened : data);
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "Choose a data folder" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Open workspace directory" }));
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("open_workspace", { path: "/chosen-workspace" }));
   await screen.findByRole("dialog", { name: "Create a task tutorial" });
   const taskInput = screen.getAllByRole("combobox", { name: "Task" })[0];
@@ -128,6 +129,69 @@ async function openOverview() {
   );
   return screen.findByRole("region", { name: "One task overview" });
 }
+async function openTaskCreation() {
+  await openOverview();
+  const picker = document.querySelector(".sidebar-project input") as HTMLInputElement;
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: "New task" } });
+  fireEvent.keyDown(picker, { key: "Enter" });
+  return screen.findByRole("dialog", { name: "Create task" });
+}
+it("creates a task without a default code or last-used preselection", async () => {
+  localStorage.setItem("worklog.lastCode:test-workspace", JSON.stringify("test"));
+  render(<App />);
+  const dialog = await openTaskCreation();
+  expect((within(dialog).getByRole("combobox", { name: "Project code" }) as HTMLInputElement).value).toBe("No default");
+  expect(within(dialog).queryByText("Last used")).toBeNull();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create task" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_project", { name: "New task", defaultProjectCodeId: "" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Create task" })).toBeNull());
+  expect((within(document.querySelector(".time-panel form") as HTMLElement).getByRole("button", { name: "Log time" }) as HTMLButtonElement).disabled).toBe(true);
+});
+it("moves focus to Create task after picking, clearing, or creating a project code", async () => {
+  render(<App />);
+  const dialog = await openTaskCreation();
+  const picker = within(dialog).getByRole("combobox", { name: "Project code" });
+  const submit = within(dialog).getByRole("button", { name: "Create task" });
+  fireEvent.focus(picker);
+  fireEvent.click(screen.getByRole("option", { name: "Test" }));
+  expect(document.activeElement).toBe(submit);
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: "No default" } });
+  fireEvent.keyDown(picker, { key: "Enter" });
+  expect(document.activeElement).toBe(submit);
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: "NEWCODE" } });
+  fireEvent.keyDown(picker, { key: "Enter" });
+  await waitFor(() => expect(document.activeElement).toBe(submit));
+  expect((picker as HTMLInputElement).value).toBe("NEWCODE");
+});
+it("changes and clears a task default later in settings without changing historical entries", async () => {
+  data = { ...data, projectCodes: [...data.projectCodes, { id: "other", label: "Other", archived: false }] };
+  render(<App />);
+  await openOverview();
+  fireEvent.click(screen.getByTitle("Settings and backups"));
+  const settings = screen.getByRole("dialog", { name: "settings" });
+  const picker = within(settings).getByRole("combobox", { name: "Project code" });
+  fireEvent.focus(picker);
+  fireEvent.click(screen.getByRole("option", { name: "Other" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("update_project", expect.objectContaining({ id: "p", defaultProjectCodeId: "other" })));
+  await waitFor(() => expect((picker as HTMLInputElement).value).toBe("Other"));
+  fireEvent.focus(picker);
+  fireEvent.click(screen.getByRole("option", { name: "No default" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("update_project", expect.objectContaining({ id: "p", defaultProjectCodeId: "" })));
+  expect(mocks.request.mock.calls.some(([action]) => action === "save_entry")).toBe(false);
+});
+it("offers note creation without an overview button when no notes are open", async () => {
+  render(<App />);
+  await openOverview();
+  fireEvent.click(screen.getByTitle("Close tab"));
+  await screen.findByRole("heading", { name: "No notes open for One" });
+  expect(screen.getByRole("button", { name: "Create a note" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Open overview" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Create a note" }));
+  expect(screen.getByRole("dialog", { name: "Create note" })).toBeTruthy();
+});
 it("retains an explicitly selected time-entry task and its default code while another task is open", async () => {
   data = {
     ...data,
@@ -519,17 +583,17 @@ it("shows only the global and task roots in order, with global notes initially c
   expect(screen.getByRole("button", { name: "Toggle Global notes" }).getAttribute("aria-expanded")).toBe("false");
 });
 
-it("suggests the date for the first global note and creates it from the root menu", async () => {
+it("suggests the date for the first global note and creates it from the sidebar plus", async () => {
   render(<App />);
   await openOverview();
-  fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
+  fireEvent.click(screen.getByRole("button", { name: "New note in Global notes" }));
   const dialog = screen.getByRole("dialog", { name: "Create note" });
   const input = within(dialog).getByRole("textbox", { name: "Note name" }) as HTMLInputElement;
   expect(input.value).toBe(today());
   expect(input.selectionStart).toBe(0);
   expect(input.selectionEnd).toBe(input.value.length);
-  expect((within(dialog).getByLabelText("Create in") as HTMLSelectElement).value).toBe("global");
+  expect(within(dialog).queryByRole("combobox")).toBeNull();
+  expect(within(dialog).getByText("Global notes")).toBeTruthy();
   fireEvent.submit(input.closest("form")!);
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_note", { path: "global/notes/" + today() + ".md" }));
   fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
@@ -537,14 +601,13 @@ it("suggests the date for the first global note and creates it from the root men
   expect((screen.getByRole("textbox", { name: "Note name" }) as HTMLInputElement).value).toBe("");
 });
 
-it("limits note destinations to the active task and Global notes", async () => {
+it("creates task notes with only a name input and the current task as destination", async () => {
   data = { ...data, projects: [...data.projects, { id: "q", name: "Two", closed: false, defaultProjectCodeId: "test" }] };
   render(<App />);
   await openOverview();
   fireEvent.keyDown(window, { key: "n", ctrlKey: true });
   fireEvent.change(screen.getByLabelText("Note name"), { target: { value: "Other task" } });
-  const destinations = within(screen.getByLabelText("Create in")).getAllByRole("option");
-  expect(destinations.map((option) => (option as HTMLOptionElement).value)).toEqual(["", "global", "p"]);
+  expect(within(screen.getByRole("dialog", { name: "Create note" })).queryByRole("combobox")).toBeNull();
   fireEvent.submit(screen.getByLabelText("Note name").closest("form")!);
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_note", { path: "projects/p/notes/Other task.md" }));
   await waitFor(() => expect(document.querySelector(".tab.active")?.textContent).toContain("Other task.md"));
@@ -553,7 +616,7 @@ it("limits note destinations to the active task and Global notes", async () => {
   expect(document.querySelector(".tab.active")?.textContent).toContain("One · Overview");
 });
 
-it("creates folders from a root menu and keeps a custom name when changing note ownership", async () => {
+it("creates global folders from their root menu and keeps ordinary new notes task-owned", async () => {
   render(<App />);
   await openOverview();
   fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
@@ -564,11 +627,13 @@ it("creates folders from a root menu and keeps a custom name when changing note 
   fireEvent.change(input, { target: { value: "Reference" } });
   fireEvent.submit(input.closest("form")!);
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_folder", { path: "global/notes/Reference" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "New note in One" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.keyDown(window, { key: "n", ctrlKey: true });
   const name = screen.getByRole("textbox", { name: "Note name" });
   fireEvent.change(name, { target: { value: "Meeting notes" } });
-  fireEvent.change(screen.getByLabelText("Create in"), { target: { value: "global" } });
   expect((name as HTMLInputElement).value).toBe("Meeting notes");
+  fireEvent.submit(name.closest("form")!);
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_note", { path: "projects/p/notes/Meeting notes.md" }));
 });
 
 it("puts time history in the log time panel instead of recent entries or the toolbar", async () => {

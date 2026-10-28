@@ -16,7 +16,10 @@ type Result<T> = std::result::Result<T, String>;
 const MAX_GIT_BYTES: u64 = 16 * 1024 * 1024;
 
 pub fn fingerprint(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 pub fn definitions() -> Vec<Value> {
@@ -628,6 +631,17 @@ fn list_history(root: &Path, q: &Query) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fingerprints_keep_the_same_lowercase_sha256_encoding() {
+        assert_eq!(
+            super::fingerprint(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            super::fingerprint(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
     use super::*;
     use std::process::Command;
     fn fixture() -> (tempfile::TempDir, Value) {

@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, Folder, Plus } from "lucide-react";
 import type { Project } from "./model";
 
@@ -9,9 +17,11 @@ export default function ProjectCombo({
   onCreate,
   label = "Task",
   includeClosed = false,
+  portal = false,
 }: {
   label?: string;
   includeClosed?: boolean;
+  portal?: boolean;
   projects: Project[];
   value: string;
   onPick: (project: Project) => void;
@@ -22,6 +32,38 @@ export default function ProjectCombo({
   const [index, setIndex] = useState(-1);
   const input = useRef<HTMLInputElement>(null);
   const menu = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<{
+    top: number | "auto";
+    bottom: number | "auto";
+    left: number;
+    width: number;
+    maxHeight: number;
+  }>({ top: 0, bottom: "auto", left: 0, width: 0, maxHeight: 250 });
+  useLayoutEffect(() => {
+    if (!open || !portal) return;
+    const position = () => {
+      const rect = input.current?.getBoundingClientRect();
+      if (!rect) return;
+      const below = window.innerHeight - rect.bottom - 12;
+      const above = rect.top - 12;
+      const down = below >= Math.min(250, above);
+      const maxHeight = Math.min(250, Math.max(0, down ? below : above));
+      setPlacement({
+        top: down ? rect.bottom + 4 : "auto",
+        bottom: down ? "auto" : window.innerHeight - rect.top + 4,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      });
+    };
+    position();
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    return () => {
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+    };
+  }, [open, portal]);
   const id = useId();
   const current = projects.find((project) => project.id === value);
   const query = text.trim().toLowerCase();
@@ -46,6 +88,8 @@ export default function ProjectCombo({
     setOpen(false);
     setIndex(-1);
   };
+  const renderMenu = (list: ReactNode) =>
+    portal ? createPortal(list, document.body) : list;
   useEffect(() => {
     if (open && index >= 0)
       menu.current?.children[index]?.scrollIntoView?.({ block: "nearest" });
@@ -54,7 +98,10 @@ export default function ProjectCombo({
     <div
       className="project-combo"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+        if (
+          !event.currentTarget.contains(event.relatedTarget as Node | null) &&
+          !menu.current?.contains(event.relatedTarget as Node | null)
+        )
           setOpen(false);
       }}
     >
@@ -138,13 +185,14 @@ export default function ProjectCombo({
       >
         <ChevronDown size={14} />
       </button>
-      {open && (
+      {open && renderMenu(
         <div
           ref={menu}
           id={id}
           role="listbox"
           aria-label={label + "s"}
-          className="combo-menu"
+          className={`combo-menu${portal ? " combo-menu-portal" : ""}`}
+          style={portal ? placement : undefined}
         >
           {matches.map((project, choice) => (
             <button

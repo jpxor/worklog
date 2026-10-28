@@ -4,6 +4,23 @@ import { afterEach, expect, it, vi } from "vitest";
 import NoteTree from "./NoteTree";
 
 afterEach(cleanup);
+it("offers a compact root creation button even while an empty section is collapsed", () => {
+  const onNewNote = vi.fn();
+  const props = { notes: [], folders: [], prefix: "global/notes", projectName: "Global notes", active: "", onOpen: vi.fn(), onMove: vi.fn(), onRename: vi.fn(), onNewNote, defaultCollapsed: true };
+  const { rerender } = render(<NoteTree {...props} />);
+  const button = screen.getByRole("button", { name: "New note in Global notes" });
+  expect(button.title).toBe("New note in Global notes");
+  expect(screen.queryByText("Write your first note")).toBeNull();
+  fireEvent.click(button);
+  expect(onNewNote).toHaveBeenCalledWith("global/notes");
+  rerender(<NoteTree {...props} disabled />);
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("shows the configured task-note shortcut in the root button tooltip", () => {
+  render(<NoteTree notes={[]} folders={[]} prefix="projects/p/notes" projectName="One" active="" onOpen={vi.fn()} onMove={vi.fn()} onRename={vi.fn()} onNewNote={vi.fn()} newNoteShortcut="Ctrl+Shift+N" />);
+  expect(screen.getByRole("button", { name: "New note in One" }).title).toBe("New note in One (Ctrl+Shift+N)");
+});
 const root = "projects/p/notes";
 const source = `${root}/draft.md`;
 const nested = `${root}/folder/nested.md`;

@@ -4,11 +4,19 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
-- Fix dark-mode contrast in the Create note/folder destination dropdown (#22). Workspace data is unchanged.
-- Keep the start of long filenames visible in tabs and truncate the end with an ellipsis (#23).
-- Limit new note/folder destinations to the active task and Global notes. Switch tasks before creating content for another task (#24). Workspace data is unchanged.
-- Keep text selection visible through fenced code-block backgrounds in both appearances (#25).
-- Reduce CI work: test/build the frontend once, skip installer packaging on PRs, skip expensive desktop work for documentation-only changes, cancel superseded PR runs, and publish verified packages from the exact tagged commit without rebuilding. Keep package artifacts seven days and temporary frontend artifacts one day. Security and platform-specific Rust checks remain enabled.
+## 0.3.0
+
+- Show a single Open workspace directory action before opening a workspace; hide the toolbar, sidebar, tabs, time panel, timer, and status bar until opening succeeds.
+- Add compact sidebar [+] note buttons, including collapsed Global notes. Hover over the task button for its configured shortcut. Keep only Create a note in the empty note pane; access overviews from sidebar roots.
+- Create notes and folders with a name-only dialog and a destination label. New note uses the current task; use the Global notes [+] for global notes. Switch tasks first to create content for another task.
+- Keep the beginning of long tab names visible with an ellipsis, and keep selected text visible through code-block backgrounds in both appearances.
+- Allow tasks to have No default project code. Set, change, or clear it in Settings → Tasks. Saved time and explicit entry overrides keep their codes; time entries still require an active code.
+- Improve Create task with spaced Cancel/Create actions, no Last used label, focus on Create task after selecting or creating a code, and a dropdown that scrolls outside the modal without clipping.
+- Use consistent blue keyboard-focus rings. Tab inserts a literal tab in Markdown and plain-text notes; Escape followed by Tab leaves the editor, and Shift+Tab moves focus backward.
+- Update SHA-2, Vite, the React Vite plugin, TypeScript, jsdom, and pinned GitHub Actions. Refresh dependency licensing materials and validate the combined upgrades.
+- Reduce CI duplication and publish verified Windows/Linux packages from the exact tested main commit without rebuilding during publication.
+- Compatibility: workspace format remains 3. No-default tasks store an empty defaultProjectCodeId. Assign defaults to every task before reopening in 0.2.x or earlier builds that require defaults. Back up workspaces before upgrading; existing notes and time entries are retained.
+- Validation: frontend, TypeScript/build, Rust, release tooling, dependency/security and licensing checks are required before publication. Windows remains unsigned. Clean-machine Windows and graphical Ubuntu smoke testing are not established by CI; Ubuntu 24.04 container installation checks remain separate from graphical testing.
 
 ## 0.2.0
 

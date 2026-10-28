@@ -1,9 +1,39 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { EditorView } from "@codemirror/view";
 import Editor from "./Editor";
 
 afterEach(cleanup);
+
+it.each([false, true])("inserts a literal tab without losing focus (plain: %s)", (plain) => {
+  const onChange = vi.fn();
+  const { container } = render(<Editor content="abcd" plain={plain} onChange={onChange} onCursor={() => {}} />);
+  const view = EditorView.findFromDOM(container.querySelector(".cm-editor")!)!;
+  act(() => {
+    view.focus();
+    view.dispatch({ selection: { anchor: 2 } });
+  });
+  fireEvent.keyDown(view.contentDOM, { key: "Tab", code: "Tab", keyCode: 9 });
+  expect(view.state.doc.toString()).toBe("ab\tcd");
+  expect(view.state.selection.main.head).toBe(3);
+  expect(view.hasFocus).toBe(true);
+  expect(onChange).toHaveBeenCalledWith("ab\tcd");
+});
+
+it("replaces the selection with a tab and lets Escape then Tab leave the editor", () => {
+  const { container } = render(<Editor content="abcdef" onChange={() => {}} onCursor={() => {}} />);
+  const view = EditorView.findFromDOM(container.querySelector(".cm-editor")!)!;
+  act(() => {
+    view.focus();
+    view.dispatch({ selection: { anchor: 1, head: 5 } });
+  });
+  fireEvent.keyDown(view.contentDOM, { key: "Tab", code: "Tab", keyCode: 9 });
+  expect(view.state.doc.toString()).toBe("a\tf");
+  fireEvent.keyDown(view.contentDOM, { key: "Escape", code: "Escape", keyCode: 27 });
+  expect(fireEvent.keyDown(view.contentDOM, { key: "Tab", code: "Tab", keyCode: 9 })).toBe(true);
+  expect(view.state.doc.toString()).toBe("a\tf");
+});
 
 it("groups quote and code lines into separate scrolling blocks without swallowing prose", () => {
   const { container } = render(
@@ -53,7 +83,9 @@ it("keeps heading text and markers neutral when switching themes", () => {
     const spans = [...container.querySelectorAll(".cm-line span")];
     expect(spans.length).toBeGreaterThan(0);
     for (const span of spans) {
-      expect(getComputedStyle(span).color).toBe("inherit");
+      expect(getComputedStyle(span).color).toBe(
+        getComputedStyle(span.parentElement!).color,
+      );
     }
     expect(container.querySelector(".cm-content")?.textContent).toBe(
       "# Heading",
