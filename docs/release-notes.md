@@ -4,6 +4,8 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Limit new note/folder destinations to the active task and Global notes. Switch tasks before creating content for another task (#24). Workspace data is unchanged.
+
 - Reduce CI work: test/build the frontend once, skip installer packaging on PRs, skip expensive desktop work for documentation-only changes, cancel superseded PR runs, and publish verified packages from the exact tagged commit without rebuilding. Keep package artifacts seven days and temporary frontend artifacts one day. Security and platform-specific Rust checks remain enabled.
 ## 0.2.0
 

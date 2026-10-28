@@ -953,6 +953,8 @@ export default function App() {
       if (!creatingNote?.owner)
         throw new Error("Choose a task or Global notes");
       const { folder, owner } = creatingNote;
+      if (owner !== "global" && owner !== wsRef.current.project)
+        throw new Error("Switch to the task before creating a note or folder for it.");
       let name = creatingNote.name.trim();
       if (!name) throw new Error("Enter a name");
       if (!folder && !/\.(md|txt)$/i.test(name)) name += ".md";
@@ -2870,6 +2872,7 @@ export default function App() {
                 Create in
                 <select
                   required
+                  aria-describedby="create-note-destination-hint"
                   value={creatingNote.owner}
                   onChange={(e) =>
                     setCreatingNote({
@@ -2885,7 +2888,7 @@ export default function App() {
                   <option value="">Select a task or Global notes</option>
                   <option value="global">Global notes</option>
                   {data.projects
-                    .filter((p) => !p.closed)
+                    .filter((p) => !p.closed && p.id === ws.project)
                     .map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -2893,6 +2896,7 @@ export default function App() {
                     ))}
                 </select>
               </label>
+              <small id="create-note-destination-hint">Switch tasks first to create a note or folder for another task.</small>
               {creatingNote.base && <small>Folder: {creatingNote.base}</small>}
               {error && <p role="alert">{error}</p>}
               <div className="settings-actions">
