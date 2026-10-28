@@ -316,6 +316,8 @@ kbd {
   position: relative;
 }
 .tab > button:first-child {
+  min-width: 0;
+  justify-content: flex-start;
   border: 0;
   background: transparent;
   font-size: 11px;
@@ -323,6 +325,17 @@ kbd {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
+}
+.tab-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.tab > button > svg,
+.tab > button > small,
+.tab > .icon {
+  flex-shrink: 0;
 }
 .tab.active {
   background: #fffefa;

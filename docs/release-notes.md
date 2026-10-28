@@ -4,6 +4,8 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Keep the start of long filenames visible in tabs and truncate the end with an ellipsis (#23).
+
 - Fix dark-mode contrast in the Create note/folder destination dropdown (#22). Workspace data is unchanged.
 
 - Reduce CI work: test/build the frontend once, skip installer packaging on PRs, skip expensive desktop work for documentation-only changes, cancel superseded PR runs, and publish verified packages from the exact tagged commit without rebuilding. Keep package artifacts seven days and temporary frontend artifacts one day. Security and platform-specific Rust checks remain enabled.
