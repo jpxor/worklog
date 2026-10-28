@@ -12,7 +12,8 @@
   background: #3a3a3a;
 }
 [data-theme="dark"] input,
-[data-theme="dark"] textarea {
+[data-theme="dark"] textarea,
+[data-theme="dark"] .create-note-form select {
   color: #dfdfdf;
   background: #262626;
   border-color: #484848;
