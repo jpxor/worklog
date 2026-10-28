@@ -391,14 +391,15 @@ kbd {
   min-width: 100%;
 }
 .cm-scroll-code {
-  background: #f3f4ec;
+  /* CodeMirror draws selection behind the content. Keep this tint translucent. */
+  background: rgba(113, 140, 89, 0.08);
 }
 .cm-code-line {
   font-family: "Cascadia Code", Consolas, monospace;
   white-space: pre !important;
   overflow-wrap: normal !important;
   word-break: normal !important;
-  background: #f3f4ec;
+  background: transparent;
 }
 .cm-quote-line {
   font-family: "Cascadia Code", Consolas, monospace;

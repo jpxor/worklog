@@ -112,9 +112,8 @@
   background: #242424;
   color: #dfdfdf;
 }
-[data-theme="dark"] .cm-code-line,
 [data-theme="dark"] .cm-scroll-code {
-  background: #2e2e2e;
+  background: rgba(255, 255, 255, 0.05);
 }
 [data-theme="dark"] .cm-gutters {
   color: #838383 !important;
