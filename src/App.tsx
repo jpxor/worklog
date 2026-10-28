@@ -1754,6 +1754,7 @@ export default function App() {
                   notes={data.notes}
                   folders={data.folders}
                   prefix={noteRoot}
+                  newNoteShortcut={bindings.newNote}
                   projectName={activeProject?.name || "Task notes"}
                   active={ws.active}
                   onOpen={(path) => {

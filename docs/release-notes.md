@@ -4,6 +4,8 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Add compact [+] buttons beside sidebar note roots, including collapsed Global notes, and show the configured task-note shortcut on hover. Remove oversized empty-sidebar creation buttons.
+
 - Simplify note/folder creation to a name field and destination label. New note uses the current task; create global notes from Global notes.
 
 - Keep text selection visible through fenced code-block backgrounds in both appearances (#25).

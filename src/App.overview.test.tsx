@@ -519,11 +519,10 @@ it("shows only the global and task roots in order, with global notes initially c
   expect(screen.getByRole("button", { name: "Toggle Global notes" }).getAttribute("aria-expanded")).toBe("false");
 });
 
-it("suggests the date for the first global note and creates it from the root menu", async () => {
+it("suggests the date for the first global note and creates it from the sidebar plus", async () => {
   render(<App />);
   await openOverview();
-  fireEvent.contextMenu(screen.getByRole("button", { name: "Global notes" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "New note" }));
+  fireEvent.click(screen.getByRole("button", { name: "New note in Global notes" }));
   const dialog = screen.getByRole("dialog", { name: "Create note" });
   const input = within(dialog).getByRole("textbox", { name: "Note name" }) as HTMLInputElement;
   expect(input.value).toBe(today());

@@ -6,7 +6,7 @@ import {
   type MouseEvent,
 } from "react";
 import ContextMenu from "./ContextMenu";
-import { ChevronDown, ChevronRight, FileText, Folder, Pin } from "lucide-react";
+import { ChevronDown, ChevronRight, Folder, Pin, Plus } from "lucide-react";
 import type { Note } from "./model";
 import FileIcon from "./FileIcon";
 
@@ -17,6 +17,7 @@ export default function NoteTree({
   prefix,
   workspace = "",
   onNewNote,
+  newNoteShortcut,
   onNewFolder,
   projectName = "Project root",
   active,
@@ -38,6 +39,7 @@ export default function NoteTree({
   prefix: string;
   workspace?: string;
   onNewNote?: (folder: string) => void;
+  newNoteShortcut?: string;
   onNewFolder?: (folder: string) => void;
   projectName?: string;
   active: string;
@@ -249,6 +251,17 @@ export default function NoteTree({
           <Folder size={14} />
           {projectName}
         </button>
+        {onNewNote && (
+          <button
+            className="icon tree-new-note"
+            aria-label={`New note in ${projectName}`}
+            title={`New note in ${projectName}${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}
+            disabled={disabled}
+            onClick={() => onNewNote(prefix)}
+          >
+            <Plus size={14} />
+          </button>
+        )}
       </div>
       {target && (
         <small role="status">
@@ -268,12 +281,6 @@ export default function NoteTree({
               .map((path) => renderFile(path, path.split("/").at(-1)!))}
           </div>
           {render(prefix)}
-          {!paths.some((path) => path.startsWith(prefix + "/")) && onNewNote && (
-            <button className="empty-note" disabled={disabled} onClick={() => onNewNote(prefix)}>
-              <FileText size={14} />
-              Write your first note
-            </button>
-          )}
         </>
       )}
       {menu && (

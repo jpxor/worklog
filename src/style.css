@@ -1455,6 +1455,7 @@ kbd {
 .overview-todos button.completed { text-decoration: line-through; opacity: .6; }
 .overview-empty { padding: 40px 0; color: #747970; }
 .tree-root.selected { background: #e5eadd; color: #405636; }
+.tree-root-row .tree-new-note { flex: 0 0 auto; }
 [data-theme="dark"] .overview-note { border-color: #3d3d3d; }
 [data-theme="dark"] .overview-header p,
 [data-theme="dark"] .overview-note-heading time,
