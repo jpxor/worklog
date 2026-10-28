@@ -12,7 +12,8 @@
   background: #3a3a3a;
 }
 [data-theme="dark"] input,
-[data-theme="dark"] textarea {
+[data-theme="dark"] textarea,
+[data-theme="dark"] .create-note-form select {
   color: #dfdfdf;
   background: #262626;
   border-color: #484848;
@@ -112,9 +113,8 @@
   background: #242424;
   color: #dfdfdf;
 }
-[data-theme="dark"] .cm-code-line,
 [data-theme="dark"] .cm-scroll-code {
-  background: #2e2e2e;
+  background: rgba(255, 255, 255, 0.05);
 }
 [data-theme="dark"] .cm-gutters {
   color: #838383 !important;
