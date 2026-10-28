@@ -4,6 +4,9 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Make task default project codes optional, starting at No default. Change or clear them later in Settings → Tasks. Time entries still require a code. No-default tasks store an empty `defaultProjectCodeId`; assign defaults to all tasks before reopening the workspace in earlier builds.
+- Improve Create task with spaced actions, no Last used label, focus on Create task after code selection/creation, and a dropdown that scrolls outside the modal without clipping.
+
 - Show a single Open workspace directory action before a workspace is selected. Hide the task sidebar, toolbar, tabs, time panel, timer, and status bar until opening succeeds.
 
 - Keep the empty note pane focused on Create a note; remove its Open overview button. Task overviews remain available from sidebar roots.

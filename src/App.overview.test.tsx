@@ -17,6 +17,7 @@ vi.mock("./api", () => ({
   directory: vi.fn(),
   exportFile: vi.fn(),
   confirmAction: vi.fn(),
+  mcpControl: vi.fn().mockRejectedValue(new Error("Unavailable in this test")),
 }));
 import App from "./App";
 import { directory, exportFile } from "./api";
@@ -48,8 +49,17 @@ beforeEach(() => {
     .mockImplementation(
       async (
         action: string,
-        payload: { expected: string; content: string; path: string },
+        payload: { expected: string; content: string; path: string; name: string; defaultProjectCodeId: string; id: string; label: string },
       ) => {
+        if (action === "create_project") {
+          data = { ...data, projects: [...data.projects, { id: "new-task", name: payload.name, closed: false, defaultProjectCodeId: payload.defaultProjectCodeId }] };
+        }
+        if (action === "update_project") {
+          data = { ...data, projects: data.projects.map((p) => p.id === payload.id ? { ...p, defaultProjectCodeId: payload.defaultProjectCodeId } : p) };
+        }
+        if (action === "create_project_code") {
+          data = { ...data, projectCodes: [...data.projectCodes, { id: "new-code", label: payload.label, archived: false }] };
+        }
         if (action === "create_note") {
           data = {
             ...data,
@@ -119,6 +129,59 @@ async function openOverview() {
   );
   return screen.findByRole("region", { name: "One task overview" });
 }
+async function openTaskCreation() {
+  await openOverview();
+  const picker = document.querySelector(".sidebar-project input") as HTMLInputElement;
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: "New task" } });
+  fireEvent.keyDown(picker, { key: "Enter" });
+  return screen.findByRole("dialog", { name: "Create task" });
+}
+it("creates a task without a default code or last-used preselection", async () => {
+  localStorage.setItem("worklog.lastCode:test-workspace", JSON.stringify("test"));
+  render(<App />);
+  const dialog = await openTaskCreation();
+  expect((within(dialog).getByRole("combobox", { name: "Project code" }) as HTMLInputElement).value).toBe("No default");
+  expect(within(dialog).queryByText("Last used")).toBeNull();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Create task" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_project", { name: "New task", defaultProjectCodeId: "" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Create task" })).toBeNull());
+  expect((within(document.querySelector(".time-panel form") as HTMLElement).getByRole("button", { name: "Log time" }) as HTMLButtonElement).disabled).toBe(true);
+});
+it("moves focus to Create task after picking, clearing, or creating a project code", async () => {
+  render(<App />);
+  const dialog = await openTaskCreation();
+  const picker = within(dialog).getByRole("combobox", { name: "Project code" });
+  const submit = within(dialog).getByRole("button", { name: "Create task" });
+  fireEvent.focus(picker);
+  fireEvent.click(screen.getByRole("option", { name: "Test" }));
+  expect(document.activeElement).toBe(submit);
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: "No default" } });
+  fireEvent.keyDown(picker, { key: "Enter" });
+  expect(document.activeElement).toBe(submit);
+  fireEvent.focus(picker);
+  fireEvent.change(picker, { target: { value: "NEWCODE" } });
+  fireEvent.keyDown(picker, { key: "Enter" });
+  await waitFor(() => expect(document.activeElement).toBe(submit));
+  expect((picker as HTMLInputElement).value).toBe("NEWCODE");
+});
+it("changes and clears a task default later in settings without changing historical entries", async () => {
+  data = { ...data, projectCodes: [...data.projectCodes, { id: "other", label: "Other", archived: false }] };
+  render(<App />);
+  await openOverview();
+  fireEvent.click(screen.getByTitle("Settings and backups"));
+  const settings = screen.getByRole("dialog", { name: "settings" });
+  const picker = within(settings).getByRole("combobox", { name: "Project code" });
+  fireEvent.focus(picker);
+  fireEvent.click(screen.getByRole("option", { name: "Other" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("update_project", expect.objectContaining({ id: "p", defaultProjectCodeId: "other" })));
+  await waitFor(() => expect((picker as HTMLInputElement).value).toBe("Other"));
+  fireEvent.focus(picker);
+  fireEvent.click(screen.getByRole("option", { name: "No default" }));
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("update_project", expect.objectContaining({ id: "p", defaultProjectCodeId: "" })));
+  expect(mocks.request.mock.calls.some(([action]) => action === "save_entry")).toBe(false);
+});
 it("offers note creation without an overview button when no notes are open", async () => {
   render(<App />);
   await openOverview();

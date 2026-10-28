@@ -215,6 +215,16 @@ kbd {
   display: block;
   color: #89907d;
 }
+.combo-menu-portal {
+  position: fixed;
+  right: auto;
+  z-index: 100;
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.create-task-modal { width: 440px; max-width: calc(100vw - 40px); }
+.create-task-modal .settings-actions { justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 18px; border-top: 1px solid #dddfd4; }
+.create-task-modal .field-hint { line-height: 1.6; }
 .sidebar-section {
   display: flex;
   align-items: center;

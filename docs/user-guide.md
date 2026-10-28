@@ -47,7 +47,9 @@ To use an existing version-3 workspace from before this rename, close every app 
 
 ## Tasks, project codes, and Global notes
 
-Tasks hold notes, daily logs, attachments, and overviews. Project codes independently group time across tasks. Select or create codes inline in the time form. Each task has a default; each entry stores its own code. Changing a default affects future entries only. Editing an entry loads its saved code. New tasks suggest the last successfully used active code. Renames update historical code labels; archiving preserves history but prevents new assignments until restored.
+Tasks hold notes, daily logs, attachments, and overviews. Project codes independently group time across tasks. Select or create codes inline in the time form. New tasks start with **No default**; choosing a default project code is optional. After selecting or creating a code in the task dialog, focus moves to **Create task**. In **Settings → Tasks**, select a task and change or clear its default project code. Changing a default affects future entries and drafts using the task default, while saved time and explicit per-entry code choices are retained. Each time entry still requires an active project code; select one before logging time for a task without a default. Editing an entry loads its saved code. Renames update historical code labels; archiving preserves history but prevents new assignments until restored.
+
+No default is stored as an empty `defaultProjectCodeId` in format 3. Earlier builds that require a code on every task cannot open a workspace containing these tasks. Assign a default to every task before opening it in an earlier build.
 
 A partially filled time draft survives editor task navigation. The mismatch notice identifies its actual destination; Use current task explicitly retargets a new draft while retaining date, duration, and description. The timer fills that draft and never logs automatically.
 

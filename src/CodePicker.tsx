@@ -8,12 +8,16 @@ export default function CodePicker({
   onPick,
   onCreate,
   onRestore,
+  allowNone = false,
+  portal = false,
 }: {
   codes: ProjectCode[];
   value: string;
   onPick: (id: string) => void;
   onCreate: (label: string) => Promise<string>;
   onRestore: (code: ProjectCode) => Promise<void>;
+  allowNone?: boolean;
+  portal?: boolean;
 }) {
   const [error, setError] = useState("");
   const [failedLabel, setFailedLabel] = useState("");
@@ -42,9 +46,10 @@ export default function CodePicker({
   return (
     <div>
       <ProjectCombo
+        portal={portal}
         includeClosed
         label="Project code"
-        projects={codes.map((c) => ({
+        projects={(allowNone ? [{ id: "", label: "No default", archived: false }, ...codes] : codes).map((c) => ({
           id: c.id,
           name: c.label,
           closed: c.archived,

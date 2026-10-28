@@ -2,7 +2,7 @@ export interface Project {
   id: string;
   name: string;
   closed: boolean;
-  defaultProjectCodeId: string;
+  defaultProjectCodeId: string; // Empty means no default; time entries still require a code.
 }
 export interface ProjectCode {
   id: string;

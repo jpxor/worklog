@@ -136,7 +136,7 @@ Example creation record:
 
 Editing updates the existing entry while preserving its ID. Removing an entry removes its line. Validate records and replace the complete time file atomically, rejecting stale edits or removals when the entry has changed since it was opened. Git retains version history; do not add correction or void events to the live time file. The work date remains the date used for reports.
 
-Format 3 requires project-codes.json, task defaultProjectCodeId, entry projectCodeId, and global/notes/. Retain internal projects/ directories, project.json, and projectId references. New workspaces use version 3 directly; normal opening, clone, and restore reject older formats. No workspace upgrade tooling or startup migration is included.
+Format 3 requires project-codes.json, task defaultProjectCodeId (empty string for no default), entry projectCodeId (always a valid code), and global/notes/. Retain internal projects/ directories, project.json, and projectId references. New workspaces use version 3 directly; normal opening, clone, and restore reject older formats. No workspace upgrade tooling or startup migration is included.
 
 Writes must be serialized and durable before reporting success. Detect malformed records and interrupted final writes without silently discarding data. Save notes using a safe replacement strategy. A second app instance must not concurrently write the same data directory.
 
@@ -230,7 +230,7 @@ Sharing starts off, is controlled in Settings, and pins the selected workspace u
 
 ## Tasks, codes, and global notes contract
 
-Tasks own notes and separate tab sessions. Independent project codes have stable IDs, trimmed labels, and archived status. Reject empty/control-character labels and case-insensitive duplicates including archived codes. Each task requires a defaultProjectCodeId and each entry requires projectCodeId. Defaults affect future entries only; edits load saved codes. Rename changes historical display labels. Archived references remain valid but new time requires an active code; provide restore. Keep stale-edit protection.
+Tasks own notes and separate tab sessions. Independent project codes have stable IDs, trimmed labels, and archived status. Reject empty/control-character labels and case-insensitive duplicates including archived codes. Each task stores defaultProjectCodeId, allowing an empty string for no default; each entry requires a valid projectCodeId. New tasks start without a default, and Settings allows setting or clearing it later. Defaults affect future entries and drafts that use the default; explicit entry overrides and saved history retain their codes. Earlier builds that require task defaults cannot open these workspaces until every task has a default assigned. Rename changes historical display labels. Archived references remain valid but new time requires an active code; provide restore. Keep stale-edit protection.
 
 Provide inline task/code creation and search. New tasks suggest the last successfully used active code. Preserve non-pristine time drafts across editor navigation and show their destination with an explicit Use current task action. The timer only populates the visible draft.
 

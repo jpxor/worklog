@@ -568,6 +568,14 @@ export default function App() {
       );
   }, [ws.project]);
   useEffect(() => {
+    setDraft((d) => {
+      if (!d.project || d.overridden || d.replaces) return d;
+      const project = data.projects.find((p) => p.id === d.project);
+      if (!project || d.projectCodeId === project.defaultProjectCodeId) return d;
+      return { ...d, projectCodeId: project.defaultProjectCodeId };
+    });
+  }, [data.projects]);
+  useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
       if (pending.current.size) {
         e.preventDefault();
@@ -826,6 +834,7 @@ export default function App() {
     code: string;
     forForm: boolean;
   } | null>(null);
+  const createTaskSubmit = useRef<HTMLButtonElement>(null);
   const createCode = async (label: string) => {
     const result = await run("create_project_code", { label });
     return result.projectCodes.find(
@@ -842,16 +851,10 @@ export default function App() {
     );
   const createProject = (name: string, forForm = false) => {
     if (!ensureWorkspace()) return;
-    const last =
-      forForm && draft.projectCodeId
-        ? draft.projectCodeId
-        : stored<string>(`worklog.lastCode:${data.root}`, "");
     setCreatingTask({
       name,
       forForm,
-      code: data.projectCodes.some((c) => c.id === last && !c.archived)
-        ? last
-        : "",
+      code: "",
     });
   };
   const saveTask = () =>
@@ -1382,11 +1385,11 @@ export default function App() {
               onRestore={restoreCode}
             />
             <span className="field-hint">
-              {draft.projectCodeId ===
-              data.projects.find((p) => p.id === draft.project)
-                ?.defaultProjectCodeId
-                ? "Task default"
-                : "This entry only"}
+              {!draft.projectCodeId
+                ? "Choose a code to log time"
+                : draft.projectCodeId === data.projects.find((p) => p.id === draft.project)?.defaultProjectCodeId
+                  ? "Task default"
+                  : "This entry only"}
             </span>
           </label>
           <div className="time-entry-fields">
@@ -2531,6 +2534,8 @@ export default function App() {
                   <label>
                     Default project code
                     <CodePicker
+                      allowNone
+                      portal
                       codes={data.projectCodes}
                       value={activeProject.defaultProjectCodeId}
                       onPick={(defaultProjectCodeId) => {
@@ -2808,7 +2813,8 @@ export default function App() {
             if (e.key === "Escape") setCreatingTask(null);
           }}
         >
-          <section className="modal" role="dialog" aria-label="Create task">
+          <section className="modal create-task-modal" role="dialog" aria-modal="true" aria-label="Create task">
+            <header className="modal-header"><h2>Create task</h2></header>
             <form
               className="settings-body"
               onSubmit={(e) => {
@@ -2828,28 +2834,30 @@ export default function App() {
                 />
               </label>
               <label>
-                Default project code
+                Default project code (optional)
                 <CodePicker
+                  allowNone
+                  portal
                   codes={data.projectCodes}
                   value={creatingTask.code}
-                  onPick={(code) =>
+                  onPick={(code) => {
                     setCreatingTask((previous) =>
                       previous ? { ...previous, code } : previous,
-                    )
-                  }
+                    );
+                    createTaskSubmit.current?.focus();
+                  }}
                   onCreate={createCode}
                   onRestore={restoreCode}
                 />
               </label>
-              {creatingTask.code ===
-                stored(`worklog.lastCode:${data.root}`, "") && (
-                <small>Last used</small>
-              )}
+              <p className="field-hint">You can change this later in Settings → Tasks. Time entries still need a project code.</p>
               {error && <p role="alert">{error}</p>}
-              <button type="button" onClick={() => setCreatingTask(null)}>
-                Cancel
-              </button>
-              <button disabled={busy || !creatingTask.code}>Create task</button>
+              <div className="settings-actions">
+                <button type="button" onClick={() => setCreatingTask(null)}>
+                  Cancel
+                </button>
+                <button ref={createTaskSubmit} className="primary" disabled={busy || !creatingTask.name.trim()}>Create task</button>
+              </div>
             </form>
           </section>
         </div>
