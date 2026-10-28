@@ -138,6 +138,8 @@ export default function ShortcutsPanel({
           ["New line in note or entry description", "Enter"],
           ["Choose next / previous switcher result", "↓ / ↑"],
           ["Dismiss popup, dialog, or tour", "Escape"],
+          ["Insert tab in a note", "Tab"],
+          ["Move keyboard focus out of the note", "Escape, then Tab"],
         ].map(([name, key]) => (
           <div key={name}>
             <dt>{name}</dt>

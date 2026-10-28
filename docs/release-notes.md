@@ -4,6 +4,9 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Use a consistent blue keyboard-focus outline for buttons and form controls in both appearances, replacing mixed browser outlines and input glows.
+- Insert a literal tab with Tab in Markdown and plain-text notes. Escape followed by Tab still moves focus out of the editor; Shift+Tab moves backward.
+
 - Make task default project codes optional, starting at No default. Change or clear them later in Settings → Tasks. Time entries still require a code. No-default tasks store an empty `defaultProjectCodeId`; assign defaults to all tasks before reopening the workspace in earlier builds.
 - Improve Create task with spaced actions, no Last used label, focus on Create task after code selection/creation, and a dropdown that scrolls outside the modal without clipping.
 

@@ -209,6 +209,17 @@ export default function Editor({
             keymap.of([
               { key: "Mod-f", run: () => true },
               {
+                key: "Tab",
+                run: (view) => {
+                  if (view.state.readOnly) return false;
+                  view.dispatch(view.state.replaceSelection("\t"), {
+                    scrollIntoView: true,
+                    userEvent: "input",
+                  });
+                  return true;
+                },
+              },
+              {
                 key: "Home",
                 run: (view) => blockLineBoundary(view, false),
                 shift: (view) => blockLineBoundary(view, false, true),

@@ -1,4 +1,5 @@
 :root {
+  --focus-ring: #2563a6;
   font-family: Inter, "Segoe UI", sans-serif;
   color: #30382f;
   background: #f6f5f1;
@@ -49,8 +50,15 @@ textarea {
 }
 input:focus,
 textarea:focus {
-  border-color: #7e9374;
-  box-shadow: 0 0 0 3px #7e937415;
+  border-color: var(--focus-ring);
+}
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a[href]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 textarea {
   resize: vertical;
@@ -1563,7 +1571,7 @@ kbd {
 .time-history-action { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px; min-height: 36px; }
 
 .create-note-form select { font: inherit; color: #30382f; background: #fffefa; border: 1px solid #dddfd4; border-radius: 6px; padding: 10px 11px; outline: none; }
-.create-note-form select:focus { border-color: #7e9374; box-shadow: 0 0 0 3px #7e937415; }
+.create-note-form select:focus { border-color: var(--focus-ring); }
 
 /* Keep the editor's search controls compact instead of inheriting form-field sizing. */
 .cm-panel.cm-search {
