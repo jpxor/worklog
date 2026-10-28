@@ -52,7 +52,7 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 
 `npm run build` runs TypeScript checking and Vite's production build. `npm test` runs Vitest and colocated component/model tests; `npm test -- src/model.test.ts` selects a file. Rust tests live alongside backend code and use temporary workspaces. The release tooling uses Node's built-in test runner. Documentation-only edits need link/content review; run the release checks if changing notes or version metadata. There is no separate lint or formatting gate currently. Follow surrounding style and avoid whole-file reformatting.
 
-The [build workflow](../.github/workflows/build.yml) checks and packages both supported platforms for PRs and `main`. Report local limitations in the PR and check the CI results. A local pass on one OS does not replace the other platform's build.
+The [build workflow](../.github/workflows/build.yml) runs frontend checks once on Linux and native Rust tests on both supported platforms. PRs skip installer packaging; code changes on `main` package and verify both platforms. Documentation-only changes skip expensive desktop work while preserving required check names. Native jobs reuse the shared frontend output through `tauri.ci.conf.json`; local Tauri builds retain the usual frontend build command. Run `node --test scripts/ci-tests.mjs` when changing CI selection or artifact provenance. Report local limitations in the PR and check CI results. A local pass on one OS does not replace the other platform's build.
 
 ## Packaging and smoke testing
 

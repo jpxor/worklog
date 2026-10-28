@@ -1,8 +1,10 @@
 # Releasing WorkLog
 
-Maintainers publish Windows x64 and Linux x86-64 packages through [Build and test WorkLog](../.github/workflows/build.yml). **Pushing a `vX.Y.Z` tag automatically publishes a GitHub release after checks/builds pass.** Automation first assembles a draft with all assets, then publishes it; there is no manual approval gate. A manual workflow run builds artifacts without publishing a release, even when run against a tag.
+Maintainers build Windows x64 and Linux x86-64 packages through [Build and test WorkLog](../.github/workflows/build.yml) on `main`. **Pushing a `vX.Y.Z` tag automatically publishes the verified packages for that exact commit through [Publish verified WorkLog release](../.github/workflows/release.yml).** Tag publication runs fresh security checks but does not rebuild installers. Automation assembles a draft with all assets, then publishes it; there is no manual approval gate. A manual run of the build workflow builds artifacts without publishing, even when run against a tag. A manual run of the publication workflow requires an existing release tag.
 
 WorkLog uses a main-based release model: merge a release PR, wait for checks on the resulting `main` commit, then create an annotated tag at that exact commit. Tags identify commits, not moving branches. CI rejects release commits outside `main` history; it permits an older reviewed commit on `main` when newer unrelated work has landed. Release branches are an option for future parallel maintenance, not a current requirement.
+
+PRs run frontend checks once on Linux and native Rust tests on both platforms, without packaging installers. Code changes on `main` build and verify packages; documentation-only changes skip expensive desktop steps while preserving required check names. Superseded PR runs are cancelled. Native jobs reuse the frontend artifact instead of rerunning frontend builds. Frontend artifacts expire after one day; package artifacts after seven days. Publication selects only successful builds in this repository for the exact commit, from `main` pushes or explicit manual rebuilds, and checks each package's commit/version/platform/run provenance. PR and fork artifacts are never published.
 
 For the first public release, complete the [publication readiness checklist](open-source-readiness.md), including ownership, sensitive-data review, third-party notices, and repository settings. Do not treat an automated build as proof these tasks are done. A private validation release may exercise automation before this audit is complete, provided the repository remains private and the release PR records all deferred checks. It does not establish public-launch readiness.
 
@@ -47,7 +49,7 @@ npm run release:check -- --tag vX.Y.Z --output ../worklog-release-preview.md
 
 Review the generated text, release PR diff, and Windows/Linux CI checks. Confirm there are no unintended generated files or private data. Verify required license/notice resources are present in every intended distribution; the first full dependency audit and binary notice packaging are still tracked in the publication checklist. Verify the version is unused in remote tags and GitHub Releases (including drafts); GitHub CLI users can run `gh release list --repo jpxor/worklog`.
 
-Download CI artifacts and smoke-test on clean Windows and Ubuntu 22.04 installations or VMs. Record versions, package names, results, and exceptions in the release PR:
+Download package artifacts from the successful `main` build and smoke-test on clean Windows and Ubuntu 22.04 installations or VMs. PR runs have no installers. Record versions, package names, results, and exceptions in the release PR or release follow-up:
 
 Also test Ubuntu 24.04 GNOME on Wayland: install the same DEB, launch from Applications, pin it to the dock, close and relaunch, then upgrade from the previous release. Confirm one visible WorkLog launcher and the correct icon. CI checks installation/reinstallation/removal and linked libraries in a 24.04 container; it does not test the graphical session. The DEB includes an application-ID launcher (`local.worklog.desktop.desktop`) for GTK association and a hidden legacy `WorkLog.desktop` entry to avoid duplicate menu items. Keep the application identifier, launcher filename and StartupWMClass aligned.
 
@@ -75,7 +77,7 @@ git tag -a vX.Y.Z <reviewed-main-commit-sha> -m "WorkLog vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Replace `<reviewed-main-commit-sha>` with the exact commit whose successful `main` checks you inspected. Stop if the working tree is dirty or the remote tag exists. Only execute the last two commands when ready to publish. Tag protection and maintainer authorization must be configured in GitHub. The workflow checks ancestry, versions and notes, runs frontend/Rust checks, builds both platforms, downloads their artifacts, creates checksums, and publishes with the tag's extracted release notes. Publication uses the workflow's `GITHUB_TOKEN`; no personal release token is required. The release job alone has `contents: write` permission. Actions are pinned to full commit hashes, with Dependabot proposing updates; review those updates before merging.
+Replace `<reviewed-main-commit-sha>` with the exact commit whose successful `main` checks you inspected. Stop if the working tree is dirty or the remote tag exists. Only execute the last two commands when ready to publish. Tag protection and maintainer authorization must be configured in GitHub. Publication checks ancestry, versions, notes and security, selects successful same-commit package artifacts, validates their provenance and licensing materials, creates checksums, and publishes with the tag's extracted release notes. Only the publication job has `contents: write`; it also has `actions: read` for artifact retrieval. No personal release token is required. Actions are pinned to full commit hashes, with Dependabot proposing updates; review those updates before merging.
 
 ## 4. Verify the published release
 
@@ -93,6 +95,8 @@ Download assets and verify checksums from the download directory on Linux with `
 The website is independent: if needed, run **Deploy project page** manually after enabling Pages with GitHub Actions. Confirm its links and screenshots match the release. Tags do not deploy Pages.
 
 ## Failures and withdrawal
+
+If same-commit package artifacts are missing or expired, manually run **Build and test WorkLog** with the existing release tag as its ref. Wait for that rebuild to pass, then rerun the failed publication job, or manually run **Publish verified WorkLog release** with that tag. Do not substitute artifacts from another commit or from a PR. Publication fails closed when a matching trusted build or either package is unavailable.
 
 If checks/builds fail before a release exists, inspect the failing job, fix via a PR, and normally issue a new version/tag. A transient failure can be rerun for the same immutable commit if no release was published. Publication is not idempotent: `gh release create` fails if the release already exists, including a draft. If upload or publication fails, inspect the draft, verify its assets and checksums, and finish only once it is complete; do not blindly rerun. GitHub immutable releases, when enabled, lock the tag and assets on publication, which is why all assets are attached to the draft first.
 
