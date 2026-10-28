@@ -4,6 +4,8 @@ Add user-facing changes to Unreleased. Maintainers move them into a version sect
 
 ## Unreleased
 
+- Keep the empty note pane focused on Create a note; remove its Open overview button. Task overviews remain available from sidebar roots.
+
 - Add compact [+] buttons beside sidebar note roots, including collapsed Global notes, and show the configured task-note shortcut on hover. Remove oversized empty-sidebar creation buttons.
 
 - Simplify note/folder creation to a name field and destination label. New note uses the current task; create global notes from Global notes.

@@ -128,6 +128,14 @@ async function openOverview() {
   );
   return screen.findByRole("region", { name: "One task overview" });
 }
+it("offers note creation without an overview button when no notes are open", async () => {
+  render(<App />);
+  await screen.findByRole("heading", { name: "No notes open for One" });
+  expect(screen.getByRole("button", { name: "Create a note" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Open overview" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Create a note" }));
+  expect(screen.getByRole("dialog", { name: "Create note" })).toBeTruthy();
+});
 it("retains an explicitly selected time-entry task and its default code while another task is open", async () => {
   data = {
     ...data,

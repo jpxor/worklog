@@ -2105,11 +2105,6 @@ export default function App() {
                   {activeProject ? "Create a note" : "Create your first task"}
                 </button>
               )}
-              {activeProject && (
-                <button onClick={() => openOverview(activeProject.id)}>
-                  Open overview
-                </button>
-              )}
               <span className="shortcut-hint">
                 {bindings.switcher ? (
                   <>
