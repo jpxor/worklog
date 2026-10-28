@@ -97,11 +97,11 @@ export default function NoteTabs({
               <FileIcon path={path} size={14} />
             )}
             {isGlobalTab(path) && <small>Global · </small>}
-            {path === "global:overview"
+            <span className="tab-name">{path === "global:overview"
               ? "Overview"
               : overviewProjectId(path)
                 ? `${projects.find((p) => p.id === overviewProjectId(path))?.name || "Task"} · Overview`
-                : path.split("/").at(-1)}
+                : path.split("/").at(-1)}</span>
           </button>
           <button
             className="icon"
