@@ -924,6 +924,10 @@ export default function App() {
     suggestedName = "",
   ) => {
     if (!ensureWorkspace()) return;
+    if (!projectId) {
+      guideProjectCreation();
+      return;
+    }
     setError("");
     setCreatingNote({
       folder,
@@ -2868,35 +2872,11 @@ export default function App() {
                   }
                 />
               </label>
-              <label>
-                Create in
-                <select
-                  required
-                  aria-describedby="create-note-destination-hint"
-                  value={creatingNote.owner}
-                  onChange={(e) =>
-                    setCreatingNote({
-                      ...creatingNote,
-                      owner: e.target.value,
-                      base: "",
-                      name: creatingNote.name === suggestedNoteName(creatingNote.folder, creatingNote.owner, creatingNote.base)
-                        ? suggestedNoteName(creatingNote.folder, e.target.value)
-                        : creatingNote.name,
-                    })
-                  }
-                >
-                  <option value="">Select a task or Global notes</option>
-                  <option value="global">Global notes</option>
-                  {data.projects
-                    .filter((p) => !p.closed && p.id === ws.project)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <small id="create-note-destination-hint">Switch tasks first to create a note or folder for another task.</small>
+              <small>
+                {creatingNote.owner === "global"
+                  ? "Global notes"
+                  : data.projects.find((p) => p.id === creatingNote.owner)?.name}
+              </small>
               {creatingNote.base && <small>Folder: {creatingNote.base}</small>}
               {error && <p role="alert">{error}</p>}
               <div className="settings-actions">
