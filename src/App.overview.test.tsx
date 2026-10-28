@@ -627,6 +627,7 @@ it("creates global folders from their root menu and keeps ordinary new notes tas
   fireEvent.change(input, { target: { value: "Reference" } });
   fireEvent.submit(input.closest("form")!);
   await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_folder", { path: "global/notes/Reference" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "New note in One" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.keyDown(window, { key: "n", ctrlKey: true });
   const name = screen.getByRole("textbox", { name: "Note name" });
   fireEvent.change(name, { target: { value: "Meeting notes" } });

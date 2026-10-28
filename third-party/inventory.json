@@ -1,8 +1,8 @@
 {
   "lockHashes": {
-    "package-lock.json": "5375658f69ac3b2f87267eb2a9d067537bf0a555409133daaa436950ee90d210",
-    "src-tauri/Cargo.lock": "ea2115eba8623e252b3f1d2165ce569c020347014300154d2512a7a5f67dad99",
-    "src-tauri/Cargo.toml": "2e55ba9039a7635f1f1eb90e1f25482bcaa534d338a511743c52a57490cb1e2b",
+    "package-lock.json": "9e47c5e3a286057743127f649b6828d0e1b09bd1da3e9c956e0f9ea07327eabb",
+    "src-tauri/Cargo.lock": "eae1710ab6e8ae8d65d0114011a73cb1aeb1895a66136dcc589e1ced8870f1eb",
+    "src-tauri/Cargo.toml": "b130e67e4f631cd2590b65615cb3a05531f13387fd3f0b5ce97302d106f32067",
     "src-tauri/about.toml": "c17d4c173a099f81d1f9c08bf33fa5123ff600069197936105808c43db89125d"
   },
   "npmScope": "Locked non-dev, non-optional npm dependency superset. Some packages are tree-shaken. Optional Node canvas/native dependencies are not used by the browser application.",
@@ -1073,6 +1073,12 @@
       "repository": "https://github.com/RustCrypto/utils"
     },
     {
+      "name": "block-buffer",
+      "version": "0.12.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/utils"
+    },
+    {
       "name": "blocking",
       "version": "1.7.0",
       "license": "Apache-2.0 OR MIT",
@@ -1163,6 +1169,12 @@
       "repository": "https://github.com/smol-rs/concurrent-queue"
     },
     {
+      "name": "const-oid",
+      "version": "0.10.2",
+      "license": "Apache-2.0 OR MIT",
+      "repository": "https://github.com/RustCrypto/formats"
+    },
+    {
       "name": "cookie",
       "version": "0.18.2",
       "license": "MIT OR Apache-2.0",
@@ -1201,6 +1213,12 @@
     {
       "name": "crypto-common",
       "version": "0.1.7",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/traits"
+    },
+    {
+      "name": "crypto-common",
+      "version": "0.2.2",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/traits"
     },
@@ -1267,6 +1285,12 @@
     {
       "name": "digest",
       "version": "0.10.7",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/traits"
+    },
+    {
+      "name": "digest",
+      "version": "0.11.3",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/traits"
     },
@@ -1695,6 +1719,12 @@
       "version": "1.0.3",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/pyfisch/httpdate"
+    },
+    {
+      "name": "hybrid-array",
+      "version": "0.4.15",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/hybrid-array"
     },
     {
       "name": "hyper-util",
@@ -2389,6 +2419,12 @@
     {
       "name": "sha2",
       "version": "0.10.9",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/RustCrypto/hashes"
+    },
+    {
+      "name": "sha2",
+      "version": "0.11.1",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/RustCrypto/hashes"
     },

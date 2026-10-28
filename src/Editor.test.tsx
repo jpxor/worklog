@@ -83,7 +83,9 @@ it("keeps heading text and markers neutral when switching themes", () => {
     const spans = [...container.querySelectorAll(".cm-line span")];
     expect(spans.length).toBeGreaterThan(0);
     for (const span of spans) {
-      expect(getComputedStyle(span).color).toBe("inherit");
+      expect(getComputedStyle(span).color).toBe(
+        getComputedStyle(span.parentElement!).color,
+      );
     }
     expect(container.querySelector(".cm-content")?.textContent).toBe(
       "# Heading",

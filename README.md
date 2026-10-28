@@ -84,7 +84,7 @@ Built with **Tauri 2, React 19, TypeScript, Rust, and CodeMirror 6**.
 
 ### Prerequisites
 
-- Node.js **22.13 or newer** and npm.
+- Node.js **22.22.2 or newer** from a supported even-numbered release (24 requires 24.15+) and npm.
 - Git and a Rust toolchain.
 - Windows: compatible C++ build tools and WebView2.
 - Ubuntu 22.04: GTK/WebKit build dependencies listed in the [development guide](docs/development.md).
