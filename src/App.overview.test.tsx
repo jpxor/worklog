@@ -537,6 +537,22 @@ it("suggests the date for the first global note and creates it from the root men
   expect((screen.getByRole("textbox", { name: "Note name" }) as HTMLInputElement).value).toBe("");
 });
 
+it("limits note destinations to the active task and Global notes", async () => {
+  data = { ...data, projects: [...data.projects, { id: "q", name: "Two", closed: false, defaultProjectCodeId: "test" }] };
+  render(<App />);
+  await openOverview();
+  fireEvent.keyDown(window, { key: "n", ctrlKey: true });
+  fireEvent.change(screen.getByLabelText("Note name"), { target: { value: "Other task" } });
+  const destinations = within(screen.getByLabelText("Create in")).getAllByRole("option");
+  expect(destinations.map((option) => (option as HTMLOptionElement).value)).toEqual(["", "global", "p"]);
+  fireEvent.submit(screen.getByLabelText("Note name").closest("form")!);
+  await waitFor(() => expect(mocks.request).toHaveBeenCalledWith("create_note", { path: "projects/p/notes/Other task.md" }));
+  await waitFor(() => expect(document.querySelector(".tab.active")?.textContent).toContain("Other task.md"));
+  expect(screen.queryByRole("alert")).toBeNull();
+  await openOverview();
+  expect(document.querySelector(".tab.active")?.textContent).toContain("One · Overview");
+});
+
 it("creates folders from a root menu and keeps a custom name when changing note ownership", async () => {
   render(<App />);
   await openOverview();
